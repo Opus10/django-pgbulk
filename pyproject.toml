@@ -14,7 +14,7 @@ packages = [
 ]
 version = "0.0.0"
 description = "Native postgres bulk update and upsert operations."
-authors = ["Jyve Engineering"]
+authors = ["Wes Kendall"]
 classifiers = [
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
@@ -59,3 +59,6 @@ Sphinx = "=3.0.3"
 sphinx-rtd-theme = "=0.4.3"
 temple = "*"
 tox = "=3.15.2"
+django-timezone-field = "^4.0"
+django-dynamic-fixture = "^3.1.0"
+freezegun = "^0.3.15"

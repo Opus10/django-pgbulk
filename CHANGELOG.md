@@ -1,5 +1,9 @@
 # Changelog
-## 1.0.0 (2020-06-26)
+## 1.0.1 (2020-06-28)
+### Trivial
+  - Update with the latest public django app template. [Wes Kendall, 271b456]
+
+## 1.0.0 (2020-06-27)
 ### Api-Break
   - Initial release of django-pgbulk. [Wes Kendall, 7070a26]
 

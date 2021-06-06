@@ -1,5 +1,9 @@
 # Changelog
-## 1.0.1 (2020-06-28)
+## 1.0.2 (2021-06-05)
+### Trivial
+  - Updated with the latest Django template [Wes Kendall, 71a2678]
+
+## 1.0.1 (2020-06-29)
 ### Trivial
   - Update with the latest public django app template. [Wes Kendall, 271b456]
 

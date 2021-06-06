@@ -10,7 +10,7 @@ Setup
 
 Set up your development environment with::
 
-    git clone git@github.com:jyveapp/django-pgbulk.git
+    git clone git@github.com:Opus10/django-pgbulk.git
     cd django-pgbulk
     make setup
 

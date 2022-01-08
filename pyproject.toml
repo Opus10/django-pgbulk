@@ -12,7 +12,7 @@ name = "django-pgbulk"
 packages = [
   { include = "pgbulk" }
 ]
-version = "1.0.2"
+version = "1.1.0"
 description = "Native postgres bulk update and upsert operations."
 authors = ["Wes Kendall"]
 classifiers = [

@@ -1,5 +1,12 @@
 # Changelog
-## 1.0.2 (2021-06-05)
+## 1.1.0 (2022-01-07)
+### Bug
+  - Fix error when upserting custom AutoFields [Wes Kendall, 114eb45]
+
+    ``upsert()`` previously errored when using a custom auto-incrementing field. This
+    has been tested and fixed.
+
+## 1.0.2 (2021-06-06)
 ### Trivial
   - Updated with the latest Django template [Wes Kendall, 71a2678]
 

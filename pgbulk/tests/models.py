@@ -4,6 +4,13 @@ from django.db import models
 from timezone_field import TimeZoneField
 
 
+class TestAutoFieldModel(models.Model):
+    id = models.AutoField(primary_key=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    widget = models.TextField(unique=True)
+    data = models.TextField()
+
+
 class TestModel(models.Model):
     """
     A model for testing manager utils.

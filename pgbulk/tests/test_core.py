@@ -10,6 +10,19 @@ from pgbulk.tests import models
 
 
 @pytest.mark.django_db
+def test_auto_field_upsert():
+    """Verifies that upsert works with custom AutoFields"""
+    pgbulk.upsert(
+        models.TestAutoFieldModel,
+        [models.TestAutoFieldModel(widget='widget', data='data')],
+        ["widget"],
+        ["data"],
+    )
+
+    assert models.TestAutoFieldModel.objects.count() == 1
+
+
+@pytest.mark.django_db
 def test_sync_w_char_pk():
     """
     Tests with a model that has a char pk.

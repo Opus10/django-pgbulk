@@ -182,7 +182,8 @@ def _get_upsert_sql(
     all_fields = [
         field
         for field in model._meta.fields
-        if field.column != model._meta.pk.name or not field.auto_created
+        if field.column in unique_fields
+        or not isinstance(field, models.AutoField)
     ]
 
     all_field_names = [field.column for field in all_fields]

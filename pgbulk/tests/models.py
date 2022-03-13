@@ -66,9 +66,7 @@ class TestPkForeignKey(models.Model):
     A test model with a primary key thats a foreign key to another model.
     """
 
-    my_key = models.ForeignKey(
-        TestModel, primary_key=True, on_delete=models.CASCADE
-    )
+    my_key = models.ForeignKey(TestModel, primary_key=True, on_delete=models.CASCADE)
     char_field = models.CharField(max_length=128, null=True)
 
 

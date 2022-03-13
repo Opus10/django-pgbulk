@@ -208,9 +208,7 @@ def test_sync_existing_objs_some_deleted_wo_update():
     Tests when some existing objects will be deleted on a queryset. Run syncing
     with no update fields and verify they are untouched in the sync
     """
-    objs = [
-        ddf.G(models.TestModel, int_field=i, float_field=i) for i in range(5)
-    ]
+    objs = [ddf.G(models.TestModel, int_field=i, float_field=i) for i in range(5)]
 
     results = pgbulk.sync(
         models.TestModel.objects.filter(int_field__lt=4),
@@ -236,9 +234,7 @@ def test_sync_existing_objs_some_deleted_some_updated():
     Tests when some existing objects will be deleted on a queryset. Run syncing
     with some update fields.
     """
-    objs = [
-        ddf.G(models.TestModel, int_field=i, float_field=i) for i in range(5)
-    ]
+    objs = [ddf.G(models.TestModel, int_field=i, float_field=i) for i in range(5)]
 
     results = pgbulk.sync(
         models.TestModel.objects.filter(int_field__lt=4),
@@ -362,9 +358,7 @@ def test_upsert_return_created_updated_values():
     updated = list(results.updated)
     assert len(created) == 3
     assert len(updated) == 1
-    for test_model, expected_int in zip(
-        sorted(created, key=lambda k: k.int_field), [1, 3, 4]
-    ):
+    for test_model, expected_int in zip(sorted(created, key=lambda k: k.int_field), [1, 3, 4]):
         assert test_model.int_field == expected_int
         assert test_model.float_field == 3.0  # almostequals
         assert test_model.id is not None
@@ -474,9 +468,7 @@ def test_upsert_no_updates():
         ['char_field', 'float_field'],
     )
 
-    for i, model_obj in enumerate(
-        models.TestModel.objects.order_by('int_field')
-    ):
+    for i, model_obj in enumerate(models.TestModel.objects.order_by('int_field')):
         assert model_obj.int_field == i
         assert model_obj.char_field == str(i)
         assert model_obj.float_field == i  # almostequals
@@ -492,8 +484,7 @@ def test_upsert_update_fields_returning():
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
     test_models = [
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1)
-        for i in range(3)
+        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1) for i in range(3)
     ]
 
     # Update using the int field as a uniqueness constraint
@@ -697,9 +688,7 @@ def test_upsert_all_updates_unique_int_field():
 
     # Verify that the fields were updated
     assert models.TestModel.objects.count() == 3
-    for i, model_obj in enumerate(
-        models.TestModel.objects.order_by('int_field')
-    ):
+    for i, model_obj in enumerate(models.TestModel.objects.order_by('int_field')):
         assert model_obj.int_field == i
         assert model_obj.char_field == str(i)
         assert model_obj.float_field == i  # almostequals
@@ -730,9 +719,7 @@ def test_upsert_all_updates_unique_int_field_update_float_field():
 
     # Verify that the float field was updated
     assert models.TestModel.objects.count() == 3
-    for i, model_obj in enumerate(
-        models.TestModel.objects.order_by('int_field')
-    ):
+    for i, model_obj in enumerate(models.TestModel.objects.order_by('int_field')):
         assert model_obj.int_field == i
         assert model_obj.char_field == '-1'
         assert model_obj.float_field == i  # almostequals
@@ -766,9 +753,7 @@ def test_upsert_some_updates_unique_int_field_update_float_field():
     # the char field was not updated for the first two. The char field,
     # however, should be '2' for the third model since it was created
     assert models.TestModel.objects.count() == 3
-    for i, model_obj in enumerate(
-        models.TestModel.objects.order_by('int_field')
-    ):
+    for i, model_obj in enumerate(models.TestModel.objects.order_by('int_field')):
         assert model_obj.int_field == i
         assert model_obj.char_field == '-1' if i < 2 else '2'
         assert model_obj.float_field == i  # almostequals
@@ -795,15 +780,9 @@ def test_upsert_some_updates_unique_timezone_field_update_float_field():
     pgbulk.upsert(
         models.TestUniqueTzModel,
         [
-            models.TestModel(
-                time_zone=timezone('US/Eastern'), char_field='0', float_field=0
-            ),
-            models.TestModel(
-                time_zone=timezone('US/Central'), char_field='1', float_field=1
-            ),
-            models.TestModel(
-                time_zone=timezone('UTC'), char_field='2', float_field=2
-            ),
+            models.TestModel(time_zone=timezone('US/Eastern'), char_field='0', float_field=0),
+            models.TestModel(time_zone=timezone('US/Central'), char_field='1', float_field=1),
+            models.TestModel(time_zone=timezone('UTC'), char_field='2', float_field=2),
         ],
         ['time_zone'],
         ['float_field'],
@@ -853,9 +832,7 @@ def test_upsert_some_updates_unique_int_char_field_update_float_field():
     # the char field was not updated for the first two. The char field,
     # however, should be '2' for the third model since it was created
     assert models.TestModel.objects.count() == 3
-    for i, model_obj in enumerate(
-        models.TestModel.objects.order_by('int_field')
-    ):
+    for i, model_obj in enumerate(models.TestModel.objects.order_by('int_field')):
         assert model_obj.int_field == i
         assert model_obj.char_field == str(i)
         assert model_obj.float_field == i  # almostequals
@@ -969,9 +946,7 @@ def test_update_foreign_key_pk_using_id():
         ['char_field'],
     )
     assert models.TestPkForeignKey.objects.count() == 1
-    assert models.TestPkForeignKey.objects.filter(
-        char_field='hello', my_key=t.my_key
-    ).exists()
+    assert models.TestPkForeignKey.objects.filter(char_field='hello', my_key=t.my_key).exists()
 
 
 @pytest.mark.django_db
@@ -987,9 +962,7 @@ def test_update_foreign_key_pk():
         ['char_field'],
     )
     assert models.TestPkForeignKey.objects.count() == 1
-    assert models.TestPkForeignKey.objects.filter(
-        char_field='hello', my_key=t.my_key
-    ).exists()
+    assert models.TestPkForeignKey.objects.filter(char_field='hello', my_key=t.my_key).exists()
 
 
 @pytest.mark.django_db
@@ -1004,9 +977,7 @@ def test_update_char_pk():
         ['char_field'],
     )
     assert models.TestPkChar.objects.count() == 1
-    assert models.TestPkChar.objects.filter(
-        char_field='hello', my_key='1'
-    ).exists()
+    assert models.TestPkChar.objects.filter(char_field='hello', my_key='1').exists()
 
 
 @pytest.mark.django_db

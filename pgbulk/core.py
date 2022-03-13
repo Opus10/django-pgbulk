@@ -94,15 +94,11 @@ def _sort_by_unique_fields(queryset, model_objs, unique_fields):
     """
     model = queryset.model
     connection = connections[queryset.db]
-    unique_fields = [
-        field for field in model._meta.fields if field.attname in unique_fields
-    ]
+    unique_fields = [field for field in model._meta.fields if field.attname in unique_fields]
 
     def sort_key(model_obj):
         return tuple(
-            field.get_db_prep_save(
-                getattr(model_obj, field.attname), connection
-            )
+            field.get_db_prep_save(getattr(model_obj, field.attname), connection)
             for field in unique_fields
         )
 
@@ -129,18 +125,11 @@ def _get_values_for_rows(queryset, model_objs, all_fields):
         if i == 0:
             row_values.append(
                 '({0})'.format(
-                    ', '.join(
-                        [
-                            '%s::{0}'.format(f.db_type(connection))
-                            for f in all_fields
-                        ]
-                    )
+                    ', '.join(['%s::{0}'.format(f.db_type(connection)) for f in all_fields])
                 )
             )
         else:
-            row_values.append(
-                '({0})'.format(', '.join(['%s'] * len(all_fields)))
-            )
+            row_values.append('({0})'.format(', '.join(['%s'] * len(all_fields))))
 
     return row_values, sql_args
 
@@ -154,9 +143,7 @@ def _get_return_fields_sql(returning, return_status=False, alias=None):
         return_fields_sql = ', '.join(_quote(field) for field in returning)
 
     if return_status:
-        return_fields_sql += (
-            ', CASE WHEN xmax = 0 THEN \'c\' ELSE \'u\' END AS status_'
-        )
+        return_fields_sql += ', CASE WHEN xmax = 0 THEN \'c\' ELSE \'u\' END AS status_'
 
     return return_fields_sql
 
@@ -182,46 +169,26 @@ def _get_upsert_sql(
     all_fields = [
         field
         for field in model._meta.fields
-        if field.column in unique_fields
-        or not isinstance(field, models.AutoField)
+        if field.column in unique_fields or not isinstance(field, models.AutoField)
     ]
 
     all_field_names = [field.column for field in all_fields]
-    returning = (
-        returning
-        if returning is not True
-        else [f.column for f in model._meta.fields]
-    )
-    all_field_names_sql = ', '.join(
-        [_quote(field) for field in all_field_names]
-    )
+    returning = returning if returning is not True else [f.column for f in model._meta.fields]
+    all_field_names_sql = ', '.join([_quote(field) for field in all_field_names])
 
     # Convert field names to db column names
-    unique_fields = [
-        model._meta.get_field(unique_field) for unique_field in unique_fields
-    ]
-    update_fields = [
-        model._meta.get_field(update_field) for update_field in update_fields
-    ]
+    unique_fields = [model._meta.get_field(unique_field) for unique_field in unique_fields]
+    update_fields = [model._meta.get_field(update_field) for update_field in update_fields]
 
-    unique_field_names_sql = ', '.join(
-        [_quote(field.column) for field in unique_fields]
-    )
+    unique_field_names_sql = ', '.join([_quote(field.column) for field in unique_fields])
     update_fields_sql = ', '.join(
-        [
-            '{0} = EXCLUDED.{0}'.format(_quote(field.column))
-            for field in update_fields
-        ]
+        ['{0} = EXCLUDED.{0}'.format(_quote(field.column)) for field in update_fields]
     )
 
-    row_values, sql_args = _get_values_for_rows(
-        queryset, model_objs, all_fields
-    )
+    row_values, sql_args = _get_values_for_rows(queryset, model_objs, all_fields)
 
     return_sql = (
-        'RETURNING ' + _get_return_fields_sql(returning, return_status=True)
-        if returning
-        else ''
+        'RETURNING ' + _get_return_fields_sql(returning, return_status=True) if returning else ''
     )
     ignore_duplicates_sql = ''
     if ignore_duplicate_updates:
@@ -238,19 +205,14 @@ def _get_upsert_sql(
         )
 
     on_conflict = (
-        'DO UPDATE SET {0} {1}'.format(
-            update_fields_sql, ignore_duplicates_sql
-        )
+        'DO UPDATE SET {0} {1}'.format(update_fields_sql, ignore_duplicates_sql)
         if update_fields
         else 'DO NOTHING'
     )
 
     if return_untouched:
         row_values_sql = ', '.join(
-            [
-                '(\'{0}\', {1})'.format(i, row_value[1:-1])
-                for i, row_value in enumerate(row_values)
-            ]
+            ['(\'{0}\', {1})'.format(i, row_value[1:-1]) for i, row_value in enumerate(row_values)]
         )
         sql = (
             ' WITH input_rows("temp_id_", {all_field_names_sql}) AS ('
@@ -278,9 +240,7 @@ def _get_upsert_sql(
             return_sql=return_sql,
             table_pk_name=model._meta.pk.name,
             return_fields_sql=_get_return_fields_sql(returning),
-            aliased_return_fields_sql=_get_return_fields_sql(
-                returning, alias='c'
-            ),
+            aliased_return_fields_sql=_get_return_fields_sql(returning, alias='c'),
         )
     else:
         row_values_sql = ', '.join(row_values)
@@ -337,9 +297,7 @@ def _fetch(
         with connection.cursor() as cursor:
             cursor.execute(sql, sql_args)
             if cursor.description:
-                nt_result = namedtuple(
-                    'Result', [col[0] for col in cursor.description]
-                )
+                nt_result = namedtuple('Result', [col[0] for col in cursor.description])
                 upserted = [nt_result(*row) for row in cursor.fetchall()]
 
     pk_field = model._meta.pk.name
@@ -348,12 +306,9 @@ def _fetch(
         deleted = set(orig_ids) - {getattr(r, pk_field) for r in upserted}
         model.objects.filter(pk__in=deleted).delete()
 
-    nt_deleted_result = namedtuple(
-        'DeletedResult', [model._meta.pk.name, 'status_']
-    )
+    nt_deleted_result = namedtuple('DeletedResult', [model._meta.pk.name, 'status_'])
     return UpsertResult(
-        upserted
-        + [nt_deleted_result(**{pk_field: d, 'status_': 'd'}) for d in deleted]
+        upserted + [nt_deleted_result(**{pk_field: d, 'status_': 'd'}) for d in deleted]
     )
 
 
@@ -393,20 +348,14 @@ def _upsert(
             be returned in upsert results. Set this to ``True`` to return
             untouched rows.
     """
-    queryset = (
-        queryset
-        if isinstance(queryset, models.QuerySet)
-        else queryset.objects.all()
-    )
+    queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
 
     # Populate automatically generated fields in the rows like date times
     _fill_auto_fields(queryset, model_objs)
 
     # Sort the rows to reduce the chances of deadlock during concurrent upserts
     model_objs = _sort_by_unique_fields(queryset, model_objs, unique_fields)
-    update_fields = _get_update_fields(
-        queryset, update_fields, exclude=unique_fields
-    )
+    update_fields = _get_update_fields(queryset, update_fields, exclude=unique_fields)
 
     return _fetch(
         queryset,
@@ -446,11 +395,7 @@ def update(queryset, model_objs, update_fields=None):
                 ['some_attr']
             )
     """
-    queryset = (
-        queryset
-        if isinstance(queryset, models.QuerySet)
-        else queryset.objects.all()
-    )
+    queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
     connection = connections[queryset.db]
     model = queryset.model
     update_fields = _get_update_fields(queryset, update_fields)
@@ -473,21 +418,15 @@ def update(queryset, model_objs, update_fields=None):
     if len(row_values) == 0 or len(update_fields) == 0:
         return []
 
-    db_types = [
-        model._meta.get_field(field).db_type(connection)
-        for field in value_fields
-    ]
+    db_types = [model._meta.get_field(field).db_type(connection) for field in value_fields]
 
     value_fields_sql = ', '.join(
-        '"{field}"'.format(field=model._meta.get_field(field).column)
-        for field in value_fields
+        '"{field}"'.format(field=model._meta.get_field(field).column) for field in value_fields
     )
 
     update_fields_sql = ', '.join(
         [
-            '"{field}" = "new_values"."{field}"'.format(
-                field=model._meta.get_field(field).column
-            )
+            '"{field}" = "new_values"."{field}"'.format(field=model._meta.get_field(field).column)
             for field in update_fields
         ]
     )
@@ -497,9 +436,7 @@ def update(queryset, model_objs, update_fields=None):
             '({0})'.format(
                 ', '.join(
                     [
-                        '%s::{0}'.format(db_types[i])
-                        if not row_number and i
-                        else '%s'
+                        '%s::{0}'.format(db_types[i]) if not row_number and i else '%s'
                         for i, _ in enumerate(row)
                     ]
                 )

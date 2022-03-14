@@ -1,5 +1,9 @@
 # Changelog
-## 1.1.0 (2022-01-07)
+## 1.1.1 (2022-03-13)
+### Trivial
+  - Updates to latest template, dropping py3.6 support and adding Django4 support [Wes Kendall, 35a04b0]
+
+## 1.1.0 (2022-01-08)
 ### Bug
   - Fix error when upserting custom AutoFields [Wes Kendall, 114eb45]
 

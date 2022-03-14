@@ -1,5 +1,19 @@
 # Changelog
-## 1.1.1 (2022-03-13)
+## 1.2.0 (2022-03-13)
+### Feature
+  - Handle func-based fields and allow expressions in upserts [Wes Kendall, 64458c5]
+
+    ``pgbulk.upsert`` allows users to provide a ``pgbulk.UpdateField`` object
+    to the ``update_fields`` argument, allowing a users to specify an expression
+    that happens if an update occurs.
+
+    This allows, for example, a user to do ``models.F('my_field') + 1`` and
+    increment integer fields in a ``pgbulk.upsert``.
+
+    Along with this, fields that cast to ``Func`` and other expressions are
+    properly handled during upsert.
+
+## 1.1.1 (2022-03-14)
 ### Trivial
   - Updates to latest template, dropping py3.6 support and adding Django4 support [Wes Kendall, 35a04b0]
 

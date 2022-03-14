@@ -4,6 +4,12 @@ from django.db import models
 from timezone_field import TimeZoneField
 
 
+class TestFuncFieldModel(models.Model):
+    my_key = models.CharField(unique=True, max_length=32)
+    int_val = models.IntegerField()
+    other_int_val = models.IntegerField(default=1)
+
+
 class TestAutoFieldModel(models.Model):
     id = models.AutoField(primary_key=True)
     created_at = models.DateTimeField(auto_now_add=True)

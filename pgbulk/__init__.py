@@ -1,6 +1,7 @@
 from pgbulk.core import sync
 from pgbulk.core import update
+from pgbulk.core import UpdateField
 from pgbulk.core import upsert
 
 
-__all__ = ['update', 'upsert', 'sync']
+__all__ = ['update', 'upsert', 'sync', 'UpdateField']

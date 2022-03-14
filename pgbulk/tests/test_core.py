@@ -1,6 +1,7 @@
 import datetime as dt
 
 import ddf
+from django.db.models import F
 import freezegun
 import pytest
 from pytz import timezone
@@ -10,12 +11,94 @@ from pgbulk.tests import models
 
 
 @pytest.mark.django_db
+def test_func_field_upsert():
+    """Tests the effects of setting a field to upsert using an F object"""
+    models.TestFuncFieldModel.objects.create(my_key='a', int_val=0)
+    pgbulk.upsert(
+        models.TestFuncFieldModel,
+        [models.TestFuncFieldModel(my_key='a', int_val=0)],
+        ['my_key'],
+        [pgbulk.UpdateField('int_val', expression=F('int_val') + 1)],
+    )
+    assert models.TestFuncFieldModel.objects.count() == 1
+    assert models.TestFuncFieldModel.objects.get().int_val == 1
+
+    ret = pgbulk.upsert(
+        models.TestFuncFieldModel,
+        [models.TestFuncFieldModel(my_key='a', int_val=0)],
+        ['my_key'],
+        [pgbulk.UpdateField('int_val', expression=F('int_val') - 3)],
+        ignore_duplicate_updates=True,
+        returning=True,
+        return_untouched=True,
+    )
+    assert models.TestFuncFieldModel.objects.count() == 1
+    assert models.TestFuncFieldModel.objects.get().int_val == -2
+    assert len(list(ret.updated)) == 1
+    assert len(list(ret.untouched)) == 0
+
+    ret = pgbulk.upsert(
+        models.TestFuncFieldModel,
+        [models.TestFuncFieldModel(my_key='a', int_val=-2)],
+        ['my_key'],
+        [pgbulk.UpdateField('int_val')],
+        ignore_duplicate_updates=True,
+        return_untouched=True,
+        returning=True,
+    )
+    assert models.TestFuncFieldModel.objects.count() == 1
+    assert models.TestFuncFieldModel.objects.get().int_val == -2
+    assert len(list(ret.updated)) == 0
+    assert len(list(ret.untouched)) == 1
+
+    ret = pgbulk.upsert(
+        models.TestFuncFieldModel,
+        [models.TestFuncFieldModel(my_key='b', int_val=0)],
+        ['my_key'],
+        [pgbulk.UpdateField('int_val', expression=F('int_val') - 3)],
+        returning=True,
+    )
+    assert len(list(ret.created)) == 1
+
+    ret = pgbulk.upsert(
+        models.TestFuncFieldModel,
+        [
+            models.TestFuncFieldModel(my_key='a', int_val=0),
+            models.TestFuncFieldModel(my_key='b', int_val=0),
+        ],
+        ['my_key'],
+        [pgbulk.UpdateField('int_val', expression=F('int_val') - 3)],
+        returning=True,
+    )
+    assert models.TestFuncFieldModel.objects.get(my_key='a').int_val == -5
+    assert models.TestFuncFieldModel.objects.get(my_key='b').int_val == -3
+
+    ret = pgbulk.upsert(
+        models.TestFuncFieldModel,
+        [
+            models.TestFuncFieldModel(my_key='a', int_val=0),
+            models.TestFuncFieldModel(my_key='b', int_val=0),
+        ],
+        ['my_key'],
+        [
+            pgbulk.UpdateField('int_val', expression=F('int_val') - 1),
+            pgbulk.UpdateField('other_int_val', expression=F('int_val') - 2),
+        ],
+        returning=True,
+    )
+    assert models.TestFuncFieldModel.objects.get(my_key='a').int_val == -6
+    assert models.TestFuncFieldModel.objects.get(my_key='a').other_int_val == -7
+    assert models.TestFuncFieldModel.objects.get(my_key='b').int_val == -4
+    assert models.TestFuncFieldModel.objects.get(my_key='b').other_int_val == -5
+
+
+@pytest.mark.django_db
 def test_auto_field_upsert():
     """Verifies that upsert works with custom AutoFields"""
     pgbulk.upsert(
         models.TestAutoFieldModel,
         [models.TestAutoFieldModel(widget='widget', data='data')],
-        ["widget"],
+        [pgbulk.UpdateField('widget')],
         ["data"],
     )
 
@@ -146,7 +229,7 @@ def test_sync_existing_objs_some_deleted():
             models.TestModel(int_field=5, float_field=2),
         ],
         ['int_field'],
-        ['float_field'],
+        [pgbulk.UpdateField('float_field')],
     )
 
     assert models.TestModel.objects.count() == 3

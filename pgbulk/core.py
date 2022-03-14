@@ -1,9 +1,17 @@
-from collections import namedtuple
+from collections import namedtuple, UserString
 import itertools
 
 from django.db import connections
 from django.db import models
+from django.db.models.sql.compiler import SQLCompiler
 from django.utils import timezone
+from psycopg2.extensions import AsIs
+
+
+class UpdateField(UserString):
+    def __init__(self, field, expression=None):
+        self.data = field
+        self.expression = expression
 
 
 class UpsertResult(list):
@@ -85,6 +93,26 @@ def _fill_auto_fields(queryset, values):
     return values
 
 
+def _prep_sql_args(queryset, connection, cursor, sql_args):
+    compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)
+
+    return [
+        AsIs(cursor.mogrify(*sql_arg.as_sql(compiler, connection)).decode('utf-8'))
+        if hasattr(sql_arg, 'as_sql')
+        else sql_arg
+        for sql_arg in sql_args
+    ]
+
+
+def _get_field_db_val(queryset, field, value, connection):
+    if hasattr(value, 'resolve_expression'):  # pragma: no cover
+        # Handle cases when the field is of type "Func" and other expressions.
+        # This is useful for libraries like django-rdkit that can't easily be tested
+        return value.resolve_expression(queryset.query, allow_joins=False, for_save=True)
+    else:
+        return field.get_db_prep_save(value, connection)
+
+
 def _sort_by_unique_fields(queryset, model_objs, unique_fields):
     """
     Sort a list of models by their unique fields.
@@ -98,7 +126,7 @@ def _sort_by_unique_fields(queryset, model_objs, unique_fields):
 
     def sort_key(model_obj):
         return tuple(
-            field.get_db_prep_save(getattr(model_obj, field.attname), connection)
+            _get_field_db_val(queryset, field, getattr(model_obj, field.attname), connection)
             for field in unique_fields
         )
 
@@ -110,7 +138,7 @@ def _get_values_for_row(queryset, model_obj, all_fields):
     return [
         # Convert field value to db value
         # Use attname here to support fields with custom db_column names
-        field.get_db_prep_save(getattr(model_obj, field.attname), connection)
+        _get_field_db_val(queryset, field, getattr(model_obj, field.attname), connection)
         for field in all_fields
     ]
 
@@ -164,6 +192,7 @@ def _get_upsert_sql(
     ON CONFLICT (unique_field) DO UPDATE SET field2 = EXCLUDED.field2;
     """
     model = queryset.model
+    update_expressions = {f: f.expression for f in update_fields if getattr(f, 'expression', None)}
 
     # Use all fields except pk unless the uniqueness constraint is the pk field
     all_fields = [
@@ -180,12 +209,26 @@ def _get_upsert_sql(
     unique_fields = [model._meta.get_field(unique_field) for unique_field in unique_fields]
     update_fields = [model._meta.get_field(update_field) for update_field in update_fields]
 
-    unique_field_names_sql = ', '.join([_quote(field.column) for field in unique_fields])
-    update_fields_sql = ', '.join(
-        ['{0} = EXCLUDED.{0}'.format(_quote(field.column)) for field in update_fields]
-    )
-
     row_values, sql_args = _get_values_for_rows(queryset, model_objs, all_fields)
+
+    unique_field_names_sql = ', '.join([_quote(field.column) for field in unique_fields])
+    update_fields_expressions = {
+        field.column: f'EXCLUDED.{_quote(field.column)}' for field in update_fields
+    }
+    if update_expressions:
+        connection = connections[queryset.db]
+        compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)
+        with connection.cursor() as cursor:
+            for field_name, expr in update_expressions.items():
+                expr = expr.resolve_expression(queryset.query, allow_joins=False, for_save=True)
+                update_fields_expressions[
+                    model._meta.get_field(field_name).column
+                ] = cursor.mogrify(*expr.as_sql(compiler, connection)).decode('utf-8')
+
+    update_fields_sql = ', '.join(
+        f'{_quote(field.column)} = {update_fields_expressions[field.column]}'
+        for field in update_fields
+    )
 
     return_sql = (
         'RETURNING ' + _get_return_fields_sql(returning, return_status=True) if returning else ''
@@ -199,9 +242,7 @@ def _get_upsert_sql(
                 '{0}.{1}'.format(model._meta.db_table, _quote(field.column))
                 for field in update_fields
             ),
-            excluded_update_fields_sql=', '.join(
-                'EXCLUDED.' + _quote(field.column) for field in update_fields
-            ),
+            excluded_update_fields_sql=', '.join(update_fields_expressions.values()),
         )
 
     on_conflict = (
@@ -295,6 +336,7 @@ def _fetch(
         )
 
         with connection.cursor() as cursor:
+            sql_args = _prep_sql_args(queryset, connection, cursor, sql_args)
             cursor.execute(sql, sql_args)
             if cursor.description:
                 nt_result = namedtuple('Result', [col[0] for col in cursor.description])
@@ -337,7 +379,10 @@ def _upsert(
         update_fields (List[str], default=None): A list of fields to update
             whenever objects already exist. If an empty list is provided, it
             is equivalent to doing a bulk insert on the objects that don't
-            exist. If `None`, all fields will be updated.
+            exist. If `None`, all fields will be updated. If you want to
+            perform an expression such as an ``F`` object on a field when
+            it is updated, use the ``pgbulk.UpdateField`` class. See
+            examples below.
         returning (bool|List[str]): If True, returns all fields. If a list,
             only returns fields in the list
         sync (bool, default=False): Perform a sync operation on the queryset
@@ -405,7 +450,9 @@ def update(queryset, model_objs, update_fields=None):
 
     row_values = [
         [
-            model_obj._meta.get_field(field).get_db_prep_save(
+            _get_field_db_val(
+                queryset,
+                model_obj._meta.get_field(field),
                 getattr(model_obj, model_obj._meta.get_field(field).attname),
                 connection,
             )
@@ -461,6 +508,7 @@ def update(queryset, model_objs, update_fields=None):
     update_sql_params = list(itertools.chain(*row_values))
 
     with connection.cursor() as cursor:
+        update_sql_params = _prep_sql_args(queryset, connection, cursor, update_sql_params)
         return cursor.execute(update_sql, update_sql_params)
 
 
@@ -487,7 +535,10 @@ def upsert(
         update_fields (List[str], default=None): A list of fields to update
             whenever objects already exist. If an empty list is provided, it
             is equivalent to doing a bulk insert on the objects that don't
-            exist. If `None`, all fields will be updated.
+            exist. If `None`, all fields will be updated. If you want to
+            perform an expression such as an ``F`` object on a field when
+            it is updated, use the ``pgbulk.UpdateField`` class. See
+            examples below.
         returning (bool|List[str], default=False): If True, returns all fields.
             If a list, only returns fields in the list. If False, do not
             return results from the upsert.
@@ -578,6 +629,24 @@ def upsert(
 
             # Print untouched rows
             print(results.untouched)
+
+        Use an expression for a field if an update happens. In the example
+        below, we increment ``some_int_field`` by one whenever an update happens.
+        Otherwise it defaults to zero::
+
+            results = pgbulk.upsert(
+                MyModel,
+                [
+                    MyModel(some_int_field=0, some_key='a'),
+                    MyModel(some_int_field=0, some_key='b')
+                ],
+                ['some_key'],
+                [
+                    # Use the UpdateField class to specify an expression for the update.
+                    # If provided, the expression will be executed when an update happens.
+                    pgbulk.UpdateField('some_int_field', expression=models.F('some_int_field') + 1)
+                ],
+            )
 
     """
     return _upsert(

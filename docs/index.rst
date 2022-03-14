@@ -12,7 +12,8 @@ provides several optimized bulk operations for Postgres:
    postgres ``UPDATE ON CONFLICT`` syntax to perform an atomic upsert
    operation. There are several options to this function that allow the
    user to avoid touching rows if they result in a duplicate update, along
-   with returning which rows were updated, created, or untouched.
+   with returning which rows were updated, created, or untouched. Users can
+   also use ``models.F`` objects on conflicts.
 3. `pgbulk.sync` - For syncing a list of models with a table. Does a bulk
    upsert and also deletes any rows in the source queryset that were not
    part of the input data.

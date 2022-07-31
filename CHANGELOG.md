@@ -1,5 +1,9 @@
 # Changelog
-## 1.2.0 (2022-03-13)
+## 1.2.1 (2022-07-30)
+### Trivial
+  - Updated with latest Django template, fixing doc builds [Wes Kendall, c3ed424]
+
+## 1.2.0 (2022-03-14)
 ### Feature
   - Handle func-based fields and allow expressions in upserts [Wes Kendall, 64458c5]
 

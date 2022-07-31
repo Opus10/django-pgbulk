@@ -1,6 +1,6 @@
 [build-system]
-requires = ["poetry>=1.1.13"]
-build-backend = "poetry.masonry.api"
+requires = ["poetry_core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 99
@@ -50,9 +50,10 @@ documentation = "https://django-pgbulk.readthedocs.io"
 [tool.poetry.dependencies]
 python = ">=3.7.0,<4"
 django = ">=2"
+importlib_metadata = { version = ">=4", python = "~3.7" }
 
 [tool.poetry.dev-dependencies]
-black = "21.5b1"
+black = "22.6.0"
 dj-database-url = "0.5.0"
 flake8 = "3.9.2"
 flake8-bugbear = "22.1.11"

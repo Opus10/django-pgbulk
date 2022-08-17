@@ -1,7 +1,7 @@
 django-pgbulk
 #############
 
-``django-pgplus``, forked from
+``django-pgbulk``, forked from
 `django-manager-utils <https://django-manager-utils.readthedocs.io>`__,
 provides several optimized bulk operations for Postgres:
 

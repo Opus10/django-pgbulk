@@ -1,5 +1,9 @@
 # Changelog
-## 1.2.1 (2022-07-30)
+## 1.2.2 (2022-08-17)
+### Trivial
+  - README and intro documentation fix [Wes Kendall, e75930e]
+
+## 1.2.1 (2022-07-31)
 ### Trivial
   - Updated with latest Django template, fixing doc builds [Wes Kendall, c3ed424]
 

@@ -24,19 +24,19 @@ class UpsertResult(list):
 
     @property
     def created(self):
-        return (i for i in self if i.status_ == 'c')
+        return (i for i in self if i.status_ == "c")
 
     @property
     def updated(self):
-        return (i for i in self if i.status_ == 'u')
+        return (i for i in self if i.status_ == "u")
 
     @property
     def untouched(self):
-        return (i for i in self if i.status_ == 'n')
+        return (i for i in self if i.status_ == "n")
 
     @property
     def deleted(self):
-        return (i for i in self if i.status_ == 'd')
+        return (i for i in self if i.status_ == "d")
 
 
 def _quote(field):
@@ -65,7 +65,7 @@ def _get_update_fields(queryset, to_update, exclude=None):
         for attname in to_update
         if (
             attname not in exclude
-            and not getattr(fields[attname], 'auto_now_add', False)
+            and not getattr(fields[attname], "auto_now_add", False)
             and not fields[attname].auto_created
         )
     ]
@@ -83,7 +83,7 @@ def _fill_auto_fields(queryset, values):
     auto_field_names = [
         f.attname
         for f in model._meta.fields
-        if getattr(f, 'auto_now', False) or getattr(f, 'auto_now_add', False)
+        if getattr(f, "auto_now", False) or getattr(f, "auto_now_add", False)
     ]
     now = timezone.now()
     for value in values:
@@ -97,15 +97,15 @@ def _prep_sql_args(queryset, connection, cursor, sql_args):
     compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)
 
     return [
-        AsIs(cursor.mogrify(*sql_arg.as_sql(compiler, connection)).decode('utf-8'))
-        if hasattr(sql_arg, 'as_sql')
+        AsIs(cursor.mogrify(*sql_arg.as_sql(compiler, connection)).decode("utf-8"))
+        if hasattr(sql_arg, "as_sql")
         else sql_arg
         for sql_arg in sql_args
     ]
 
 
 def _get_field_db_val(queryset, field, value, connection):
-    if hasattr(value, 'resolve_expression'):  # pragma: no cover
+    if hasattr(value, "resolve_expression"):  # pragma: no cover
         # Handle cases when the field is of type "Func" and other expressions.
         # This is useful for libraries like django-rdkit that can't easily be tested
         return value.resolve_expression(queryset.query, allow_joins=False, for_save=True)
@@ -152,26 +152,26 @@ def _get_values_for_rows(queryset, model_objs, all_fields):
         sql_args.extend(_get_values_for_row(queryset, model_obj, all_fields))
         if i == 0:
             row_values.append(
-                '({0})'.format(
-                    ', '.join(['%s::{0}'.format(f.db_type(connection)) for f in all_fields])
+                "({0})".format(
+                    ", ".join(["%s::{0}".format(f.db_type(connection)) for f in all_fields])
                 )
             )
         else:
-            row_values.append('({0})'.format(', '.join(['%s'] * len(all_fields))))
+            row_values.append("({0})".format(", ".join(["%s"] * len(all_fields))))
 
     return row_values, sql_args
 
 
 def _get_return_fields_sql(returning, return_status=False, alias=None):
     if alias:
-        return_fields_sql = ', '.join(
-            '{0}.{1}'.format(alias, _quote(field)) for field in returning
+        return_fields_sql = ", ".join(
+            "{0}.{1}".format(alias, _quote(field)) for field in returning
         )
     else:
-        return_fields_sql = ', '.join(_quote(field) for field in returning)
+        return_fields_sql = ", ".join(_quote(field) for field in returning)
 
     if return_status:
-        return_fields_sql += ', CASE WHEN xmax = 0 THEN \'c\' ELSE \'u\' END AS status_'
+        return_fields_sql += ", CASE WHEN xmax = 0 THEN 'c' ELSE 'u' END AS status_"
 
     return return_fields_sql
 
@@ -192,7 +192,7 @@ def _get_upsert_sql(
     ON CONFLICT (unique_field) DO UPDATE SET field2 = EXCLUDED.field2;
     """
     model = queryset.model
-    update_expressions = {f: f.expression for f in update_fields if getattr(f, 'expression', None)}
+    update_expressions = {f: f.expression for f in update_fields if getattr(f, "expression", None)}
 
     # Use all fields except pk unless the uniqueness constraint is the pk field
     all_fields = [
@@ -203,7 +203,7 @@ def _get_upsert_sql(
 
     all_field_names = [field.column for field in all_fields]
     returning = returning if returning is not True else [f.column for f in model._meta.fields]
-    all_field_names_sql = ', '.join([_quote(field) for field in all_field_names])
+    all_field_names_sql = ", ".join([_quote(field) for field in all_field_names])
 
     # Convert field names to db column names
     unique_fields = [model._meta.get_field(unique_field) for unique_field in unique_fields]
@@ -211,9 +211,9 @@ def _get_upsert_sql(
 
     row_values, sql_args = _get_values_for_rows(queryset, model_objs, all_fields)
 
-    unique_field_names_sql = ', '.join([_quote(field.column) for field in unique_fields])
+    unique_field_names_sql = ", ".join([_quote(field.column) for field in unique_fields])
     update_fields_expressions = {
-        field.column: f'EXCLUDED.{_quote(field.column)}' for field in update_fields
+        field.column: f"EXCLUDED.{_quote(field.column)}" for field in update_fields
     }
     if update_expressions:
         connection = connections[queryset.db]
@@ -223,55 +223,55 @@ def _get_upsert_sql(
                 expr = expr.resolve_expression(queryset.query, allow_joins=False, for_save=True)
                 update_fields_expressions[
                     model._meta.get_field(field_name).column
-                ] = cursor.mogrify(*expr.as_sql(compiler, connection)).decode('utf-8')
+                ] = cursor.mogrify(*expr.as_sql(compiler, connection)).decode("utf-8")
 
-    update_fields_sql = ', '.join(
-        f'{_quote(field.column)} = {update_fields_expressions[field.column]}'
+    update_fields_sql = ", ".join(
+        f"{_quote(field.column)} = {update_fields_expressions[field.column]}"
         for field in update_fields
     )
 
     return_sql = (
-        'RETURNING ' + _get_return_fields_sql(returning, return_status=True) if returning else ''
+        "RETURNING " + _get_return_fields_sql(returning, return_status=True) if returning else ""
     )
-    ignore_duplicates_sql = ''
+    ignore_duplicates_sql = ""
     if ignore_duplicate_updates:
         ignore_duplicates_sql = (
-            ' WHERE ({update_fields_sql}) IS DISTINCT FROM ({excluded_update_fields_sql}) '
+            " WHERE ({update_fields_sql}) IS DISTINCT FROM ({excluded_update_fields_sql}) "
         ).format(
-            update_fields_sql=', '.join(
-                '{0}.{1}'.format(model._meta.db_table, _quote(field.column))
+            update_fields_sql=", ".join(
+                "{0}.{1}".format(model._meta.db_table, _quote(field.column))
                 for field in update_fields
             ),
-            excluded_update_fields_sql=', '.join(update_fields_expressions.values()),
+            excluded_update_fields_sql=", ".join(update_fields_expressions.values()),
         )
 
     on_conflict = (
-        'DO UPDATE SET {0} {1}'.format(update_fields_sql, ignore_duplicates_sql)
+        "DO UPDATE SET {0} {1}".format(update_fields_sql, ignore_duplicates_sql)
         if update_fields
-        else 'DO NOTHING'
+        else "DO NOTHING"
     )
 
     if return_untouched:
-        row_values_sql = ', '.join(
-            ['(\'{0}\', {1})'.format(i, row_value[1:-1]) for i, row_value in enumerate(row_values)]
+        row_values_sql = ", ".join(
+            ["('{0}', {1})".format(i, row_value[1:-1]) for i, row_value in enumerate(row_values)]
         )
         sql = (
             ' WITH input_rows("temp_id_", {all_field_names_sql}) AS ('
-            '     VALUES {row_values_sql}'
-            ' ), ins AS ( '
-            '     INSERT INTO {table_name} ({all_field_names_sql})'
-            '     SELECT {all_field_names_sql} FROM input_rows ORDER BY temp_id_'
-            '     ON CONFLICT ({unique_field_names_sql}) {on_conflict} {return_sql}'
-            ' )'
-            ' SELECT DISTINCT ON ({table_pk_name}) * FROM ('
-            '     SELECT status_, {return_fields_sql}'
-            '     FROM   ins'
-            '     UNION  ALL'
-            '     SELECT \'n\' AS status_, {aliased_return_fields_sql}'
-            '     FROM input_rows'
-            '     JOIN {table_name} c USING ({unique_field_names_sql})'
-            ' ) as results'
-            ' ORDER BY results."{table_pk_name}", CASE WHEN(status_ = \'n\') THEN 1 ELSE 0 END;'
+            "     VALUES {row_values_sql}"
+            " ), ins AS ( "
+            "     INSERT INTO {table_name} ({all_field_names_sql})"
+            "     SELECT {all_field_names_sql} FROM input_rows ORDER BY temp_id_"
+            "     ON CONFLICT ({unique_field_names_sql}) {on_conflict} {return_sql}"
+            " )"
+            " SELECT DISTINCT ON ({table_pk_name}) * FROM ("
+            "     SELECT status_, {return_fields_sql}"
+            "     FROM   ins"
+            "     UNION  ALL"
+            "     SELECT 'n' AS status_, {aliased_return_fields_sql}"
+            "     FROM input_rows"
+            "     JOIN {table_name} c USING ({unique_field_names_sql})"
+            " ) as results"
+            " ORDER BY results.\"{table_pk_name}\", CASE WHEN(status_ = 'n') THEN 1 ELSE 0 END;"
         ).format(
             all_field_names_sql=all_field_names_sql,
             row_values_sql=row_values_sql,
@@ -281,14 +281,14 @@ def _get_upsert_sql(
             return_sql=return_sql,
             table_pk_name=model._meta.pk.name,
             return_fields_sql=_get_return_fields_sql(returning),
-            aliased_return_fields_sql=_get_return_fields_sql(returning, alias='c'),
+            aliased_return_fields_sql=_get_return_fields_sql(returning, alias="c"),
         )
     else:
-        row_values_sql = ', '.join(row_values)
+        row_values_sql = ", ".join(row_values)
         sql = (
-            ' INSERT INTO {table_name} ({all_field_names_sql})'
-            ' VALUES {row_values_sql}'
-            ' ON CONFLICT ({unique_field_names_sql}) {on_conflict} {return_sql}'
+            " INSERT INTO {table_name} ({all_field_names_sql})"
+            " VALUES {row_values_sql}"
+            " ON CONFLICT ({unique_field_names_sql}) {on_conflict} {return_sql}"
         ).format(
             table_name=model._meta.db_table,
             all_field_names_sql=all_field_names_sql,
@@ -339,7 +339,7 @@ def _fetch(
             sql_args = _prep_sql_args(queryset, connection, cursor, sql_args)
             cursor.execute(sql, sql_args)
             if cursor.description:
-                nt_result = namedtuple('Result', [col[0] for col in cursor.description])
+                nt_result = namedtuple("Result", [col[0] for col in cursor.description])
                 upserted = [nt_result(*row) for row in cursor.fetchall()]
 
     pk_field = model._meta.pk.name
@@ -348,9 +348,9 @@ def _fetch(
         deleted = set(orig_ids) - {getattr(r, pk_field) for r in upserted}
         model.objects.filter(pk__in=deleted).delete()
 
-    nt_deleted_result = namedtuple('DeletedResult', [model._meta.pk.name, 'status_'])
+    nt_deleted_result = namedtuple("DeletedResult", [model._meta.pk.name, "status_"])
     return UpsertResult(
-        upserted + [nt_deleted_result(**{pk_field: d, 'status_': 'd'}) for d in deleted]
+        upserted + [nt_deleted_result(**{pk_field: d, "status_": "d"}) for d in deleted]
     )
 
 
@@ -467,23 +467,23 @@ def update(queryset, model_objs, update_fields=None):
 
     db_types = [model._meta.get_field(field).db_type(connection) for field in value_fields]
 
-    value_fields_sql = ', '.join(
+    value_fields_sql = ", ".join(
         '"{field}"'.format(field=model._meta.get_field(field).column) for field in value_fields
     )
 
-    update_fields_sql = ', '.join(
+    update_fields_sql = ", ".join(
         [
             '"{field}" = "new_values"."{field}"'.format(field=model._meta.get_field(field).column)
             for field in update_fields
         ]
     )
 
-    values_sql = ', '.join(
+    values_sql = ", ".join(
         [
-            '({0})'.format(
-                ', '.join(
+            "({0})".format(
+                ", ".join(
                     [
-                        '%s::{0}'.format(db_types[i]) if not row_number and i else '%s'
+                        "%s::{0}".format(db_types[i]) if not row_number and i else "%s"
                         for i, _ in enumerate(row)
                     ]
                 )
@@ -493,9 +493,9 @@ def update(queryset, model_objs, update_fields=None):
     )
 
     update_sql = (
-        'UPDATE {table} '
-        'SET {update_fields_sql} '
-        'FROM (VALUES {values_sql}) AS new_values ({value_fields_sql}) '
+        "UPDATE {table} "
+        "SET {update_fields_sql} "
+        "FROM (VALUES {values_sql}) AS new_values ({value_fields_sql}) "
         'WHERE "{table}"."{pk_field}" = "new_values"."{pk_field}"'
     ).format(
         table=model._meta.db_table,

@@ -1,13 +1,13 @@
 import dj_database_url
 
 
-SECRET_KEY = 'django-pgbulk'
+SECRET_KEY = "django-pgbulk"
 # Install the tests as an app so that we can make test models
 INSTALLED_APPS = [
-    'pgbulk',
-    'pgbulk.tests',
+    "pgbulk",
+    "pgbulk.tests",
 ]
 # Database url comes from the DATABASE_URL env var
-DATABASES = {'default': dj_database_url.config()}
+DATABASES = {"default": dj_database_url.config()}
 
-DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"

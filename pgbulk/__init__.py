@@ -5,4 +5,4 @@ from pgbulk.core import upsert
 from pgbulk.version import __version__
 
 
-__all__ = ['update', 'upsert', 'sync', 'UpdateField', '__version__']
+__all__ = ["update", "upsert", "sync", "UpdateField", "__version__"]

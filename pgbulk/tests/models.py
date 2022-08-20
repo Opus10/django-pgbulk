@@ -27,10 +27,10 @@ class TestModel(models.Model):
     float_field = models.FloatField(null=True)
     json_field = JSONField(default=dict)
     array_field = ArrayField(models.CharField(max_length=128), default=list)
-    time_zone = TimeZoneField(default='UTC')
+    time_zone = TimeZoneField(default="UTC")
 
     class Meta:
-        unique_together = ('int_field', 'char_field')
+        unique_together = ("int_field", "char_field")
 
 
 class TestUniqueTzModel(models.Model):
@@ -45,7 +45,7 @@ class TestUniqueTzModel(models.Model):
     time_zone = TimeZoneField(unique=True)
 
     class Meta:
-        unique_together = ('int_field', 'char_field')
+        unique_together = ("int_field", "char_field")
 
 
 class TestAutoDateTimeModel(models.Model):

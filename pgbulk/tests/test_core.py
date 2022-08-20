@@ -13,21 +13,21 @@ from pgbulk.tests import models
 @pytest.mark.django_db
 def test_func_field_upsert():
     """Tests the effects of setting a field to upsert using an F object"""
-    models.TestFuncFieldModel.objects.create(my_key='a', int_val=0)
+    models.TestFuncFieldModel.objects.create(my_key="a", int_val=0)
     pgbulk.upsert(
         models.TestFuncFieldModel,
-        [models.TestFuncFieldModel(my_key='a', int_val=0)],
-        ['my_key'],
-        [pgbulk.UpdateField('int_val', expression=F('int_val') + 1)],
+        [models.TestFuncFieldModel(my_key="a", int_val=0)],
+        ["my_key"],
+        [pgbulk.UpdateField("int_val", expression=F("int_val") + 1)],
     )
     assert models.TestFuncFieldModel.objects.count() == 1
     assert models.TestFuncFieldModel.objects.get().int_val == 1
 
     ret = pgbulk.upsert(
         models.TestFuncFieldModel,
-        [models.TestFuncFieldModel(my_key='a', int_val=0)],
-        ['my_key'],
-        [pgbulk.UpdateField('int_val', expression=F('int_val') - 3)],
+        [models.TestFuncFieldModel(my_key="a", int_val=0)],
+        ["my_key"],
+        [pgbulk.UpdateField("int_val", expression=F("int_val") - 3)],
         ignore_duplicate_updates=True,
         returning=True,
         return_untouched=True,
@@ -39,9 +39,9 @@ def test_func_field_upsert():
 
     ret = pgbulk.upsert(
         models.TestFuncFieldModel,
-        [models.TestFuncFieldModel(my_key='a', int_val=-2)],
-        ['my_key'],
-        [pgbulk.UpdateField('int_val')],
+        [models.TestFuncFieldModel(my_key="a", int_val=-2)],
+        ["my_key"],
+        [pgbulk.UpdateField("int_val")],
         ignore_duplicate_updates=True,
         return_untouched=True,
         returning=True,
@@ -53,9 +53,9 @@ def test_func_field_upsert():
 
     ret = pgbulk.upsert(
         models.TestFuncFieldModel,
-        [models.TestFuncFieldModel(my_key='b', int_val=0)],
-        ['my_key'],
-        [pgbulk.UpdateField('int_val', expression=F('int_val') - 3)],
+        [models.TestFuncFieldModel(my_key="b", int_val=0)],
+        ["my_key"],
+        [pgbulk.UpdateField("int_val", expression=F("int_val") - 3)],
         returning=True,
     )
     assert len(list(ret.created)) == 1
@@ -63,33 +63,33 @@ def test_func_field_upsert():
     ret = pgbulk.upsert(
         models.TestFuncFieldModel,
         [
-            models.TestFuncFieldModel(my_key='a', int_val=0),
-            models.TestFuncFieldModel(my_key='b', int_val=0),
+            models.TestFuncFieldModel(my_key="a", int_val=0),
+            models.TestFuncFieldModel(my_key="b", int_val=0),
         ],
-        ['my_key'],
-        [pgbulk.UpdateField('int_val', expression=F('int_val') - 3)],
+        ["my_key"],
+        [pgbulk.UpdateField("int_val", expression=F("int_val") - 3)],
         returning=True,
     )
-    assert models.TestFuncFieldModel.objects.get(my_key='a').int_val == -5
-    assert models.TestFuncFieldModel.objects.get(my_key='b').int_val == -3
+    assert models.TestFuncFieldModel.objects.get(my_key="a").int_val == -5
+    assert models.TestFuncFieldModel.objects.get(my_key="b").int_val == -3
 
     ret = pgbulk.upsert(
         models.TestFuncFieldModel,
         [
-            models.TestFuncFieldModel(my_key='a', int_val=0),
-            models.TestFuncFieldModel(my_key='b', int_val=0),
+            models.TestFuncFieldModel(my_key="a", int_val=0),
+            models.TestFuncFieldModel(my_key="b", int_val=0),
         ],
-        ['my_key'],
+        ["my_key"],
         [
-            pgbulk.UpdateField('int_val', expression=F('int_val') - 1),
-            pgbulk.UpdateField('other_int_val', expression=F('int_val') - 2),
+            pgbulk.UpdateField("int_val", expression=F("int_val") - 1),
+            pgbulk.UpdateField("other_int_val", expression=F("int_val") - 2),
         ],
         returning=True,
     )
-    assert models.TestFuncFieldModel.objects.get(my_key='a').int_val == -6
-    assert models.TestFuncFieldModel.objects.get(my_key='a').other_int_val == -7
-    assert models.TestFuncFieldModel.objects.get(my_key='b').int_val == -4
-    assert models.TestFuncFieldModel.objects.get(my_key='b').other_int_val == -5
+    assert models.TestFuncFieldModel.objects.get(my_key="a").int_val == -6
+    assert models.TestFuncFieldModel.objects.get(my_key="a").other_int_val == -7
+    assert models.TestFuncFieldModel.objects.get(my_key="b").int_val == -4
+    assert models.TestFuncFieldModel.objects.get(my_key="b").other_int_val == -5
 
 
 @pytest.mark.django_db
@@ -97,8 +97,8 @@ def test_auto_field_upsert():
     """Verifies that upsert works with custom AutoFields"""
     pgbulk.upsert(
         models.TestAutoFieldModel,
-        [models.TestAutoFieldModel(widget='widget', data='data')],
-        [pgbulk.UpdateField('widget')],
+        [models.TestAutoFieldModel(widget="widget", data="data")],
+        [pgbulk.UpdateField("widget")],
         ["data"],
     )
 
@@ -110,32 +110,32 @@ def test_sync_w_char_pk():
     """
     Tests with a model that has a char pk.
     """
-    extant_obj1 = ddf.G(models.TestPkChar, my_key='1', char_field='1')
-    extant_obj2 = ddf.G(models.TestPkChar, my_key='2', char_field='1')
-    extant_obj3 = ddf.G(models.TestPkChar, my_key='3', char_field='1')
+    extant_obj1 = ddf.G(models.TestPkChar, my_key="1", char_field="1")
+    extant_obj2 = ddf.G(models.TestPkChar, my_key="2", char_field="1")
+    extant_obj3 = ddf.G(models.TestPkChar, my_key="3", char_field="1")
 
     pgbulk.sync(
         models.TestPkChar,
         [
-            models.TestPkChar(my_key='3', char_field='2'),
-            models.TestPkChar(my_key='4', char_field='2'),
-            models.TestPkChar(my_key='5', char_field='2'),
+            models.TestPkChar(my_key="3", char_field="2"),
+            models.TestPkChar(my_key="4", char_field="2"),
+            models.TestPkChar(my_key="5", char_field="2"),
         ],
-        ['my_key'],
-        ['char_field'],
+        ["my_key"],
+        ["char_field"],
     )
 
     assert models.TestPkChar.objects.count() == 3
-    assert models.TestPkChar.objects.filter(my_key='3').exists()
-    assert models.TestPkChar.objects.filter(my_key='4').exists()
-    assert models.TestPkChar.objects.filter(my_key='5').exists()
+    assert models.TestPkChar.objects.filter(my_key="3").exists()
+    assert models.TestPkChar.objects.filter(my_key="4").exists()
+    assert models.TestPkChar.objects.filter(my_key="5").exists()
 
     with pytest.raises(models.TestPkChar.DoesNotExist):
         models.TestPkChar.objects.get(pk=extant_obj1.pk)
     with pytest.raises(models.TestPkChar.DoesNotExist):
         models.TestPkChar.objects.get(pk=extant_obj2.pk)
     test_model = models.TestPkChar.objects.get(pk=extant_obj3.pk)
-    assert test_model.char_field == '2'
+    assert test_model.char_field == "2"
 
 
 @pytest.mark.django_db
@@ -150,8 +150,8 @@ def test_sync_no_existing_objs():
             models.TestModel(int_field=3),
             models.TestModel(int_field=4),
         ],
-        ['int_field'],
-        ['float_field'],
+        ["int_field"],
+        ["float_field"],
     )
     assert models.TestModel.objects.count() == 3
     assert models.TestModel.objects.filter(int_field=1).exists()
@@ -175,8 +175,8 @@ def test_sync_existing_objs_all_deleted():
             models.TestModel(int_field=5),
             models.TestModel(int_field=6),
         ],
-        ['int_field'],
-        ['float_field'],
+        ["int_field"],
+        ["float_field"],
     )
 
     assert models.TestModel.objects.count() == 3
@@ -201,7 +201,7 @@ def test_sync_existing_objs_all_deleted_empty_sync():
     extant_obj2 = ddf.G(models.TestModel, int_field=2)
     extant_obj3 = ddf.G(models.TestModel, int_field=3)
 
-    pgbulk.sync(models.TestModel, [], ['int_field'], ['float_field'])
+    pgbulk.sync(models.TestModel, [], ["int_field"], ["float_field"])
 
     assert not models.TestModel.objects.exists()
     with pytest.raises(models.TestModel.DoesNotExist):
@@ -228,8 +228,8 @@ def test_sync_existing_objs_some_deleted():
             models.TestModel(int_field=4, float_field=2),
             models.TestModel(int_field=5, float_field=2),
         ],
-        ['int_field'],
-        [pgbulk.UpdateField('float_field')],
+        ["int_field"],
+        [pgbulk.UpdateField("float_field")],
     )
 
     assert models.TestModel.objects.count() == 3
@@ -263,8 +263,8 @@ def test_sync_existing_objs_some_deleted_w_queryset():
             models.TestModel(int_field=2, float_field=2),
             models.TestModel(int_field=3, float_field=2),
         ],
-        ['int_field'],
-        ['float_field'],
+        ["int_field"],
+        ["float_field"],
     )
 
     assert models.TestModel.objects.count() == 4
@@ -300,7 +300,7 @@ def test_sync_existing_objs_some_deleted_wo_update():
             models.TestModel(int_field=2, float_field=2),
             models.TestModel(int_field=3, float_field=2),
         ],
-        ['int_field'],
+        ["int_field"],
         [],
         returning=True,
     )
@@ -326,8 +326,8 @@ def test_sync_existing_objs_some_deleted_some_updated():
             models.TestModel(int_field=2, float_field=2),
             models.TestModel(int_field=3, float_field=2),
         ],
-        ['int_field'],
-        ['float_field'],
+        ["int_field"],
+        ["float_field"],
         returning=True,
         ignore_duplicate_updates=True,
     )
@@ -345,7 +345,7 @@ def test_upsert_return_upserts_none():
     Tests the return_upserts flag on bulk upserts when there is no data.
     """
     return_values = pgbulk.upsert(
-        models.TestModel, [], ['float_field'], ['float_field'], returning=True
+        models.TestModel, [], ["float_field"], ["float_field"], returning=True
     )
     assert not return_values
 
@@ -359,8 +359,8 @@ def test_upsert_return_multi_unique_fields_not_supported():
     return_values = pgbulk.upsert(
         models.TestModel,
         [],
-        ['float_field', 'int_field'],
-        ['float_field'],
+        ["float_field", "int_field"],
+        ["float_field"],
         returning=True,
     )
     assert not return_values
@@ -379,8 +379,8 @@ def test_upsert_return_created_values():
             models.TestModel(int_field=3),
             models.TestModel(int_field=4),
         ],
-        ['int_field'],
-        ['float_field'],
+        ["int_field"],
+        ["float_field"],
         returning=True,
     )
 
@@ -406,9 +406,9 @@ def test_upsert_return_list_of_values():
             models.TestModel(int_field=3, float_field=4),
             models.TestModel(int_field=4, float_field=5),
         ],
-        ['int_field'],
-        ['float_field'],
-        returning=['float_field'],
+        ["int_field"],
+        ["float_field"],
+        returning=["float_field"],
     )
 
     assert len(list(results.created)) == 3
@@ -432,8 +432,8 @@ def test_upsert_return_created_updated_values():
             models.TestModel(int_field=3, float_field=3.0),
             models.TestModel(int_field=4, float_field=3.0),
         ],
-        ['int_field'],
-        ['float_field'],
+        ["int_field"],
+        ["float_field"],
         returning=True,
     )
 
@@ -459,10 +459,10 @@ def test_upsert_created_updated_auto_datetime_values():
     and auto_now_add datetime values are used
     """
     # Create an item that will be updated
-    with freezegun.freeze_time('2018-09-01 00:00:00'):
+    with freezegun.freeze_time("2018-09-01 00:00:00"):
         ddf.G(models.TestAutoDateTimeModel, int_field=1)
 
-    with freezegun.freeze_time('2018-09-02 00:00:00'):
+    with freezegun.freeze_time("2018-09-02 00:00:00"):
         results = pgbulk.upsert(
             models.TestAutoDateTimeModel,
             [
@@ -471,7 +471,7 @@ def test_upsert_created_updated_auto_datetime_values():
                 models.TestAutoDateTimeModel(int_field=3),
                 models.TestAutoDateTimeModel(int_field=4),
             ],
-            ['int_field'],
+            ["int_field"],
             returning=True,
         )
 
@@ -512,13 +512,13 @@ def test_upsert_wo_update_fields():
             models.TestModel(int_field=2, float_field=3),
             models.TestModel(int_field=3, float_field=3),
         ],
-        ['int_field'],
+        ["int_field"],
         update_fields=[],
     )
     # Three objects should now exist, but no float fields should be updated
     assert models.TestModel.objects.count() == 3
     for test_model, expected_int_value in zip(
-        models.TestModel.objects.order_by('int_field'), [1, 2, 3]
+        models.TestModel.objects.order_by("int_field"), [1, 2, 3]
     ):
         assert test_model.int_field == expected_int_value
         assert test_model.float_field == expected_int_value
@@ -530,7 +530,7 @@ def test_upsert_w_blank_arguments():
     Tests using required arguments and using blank arguments for everything
     else.
     """
-    pgbulk.upsert(models.TestModel, [], ['field'], ['field'])
+    pgbulk.upsert(models.TestModel, [], ["field"], ["field"])
     assert not models.TestModel.objects.exists()
 
 
@@ -543,15 +543,15 @@ def test_upsert_no_updates():
     pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=0, char_field='0', float_field=0),
-            models.TestModel(int_field=1, char_field='1', float_field=1),
-            models.TestModel(int_field=2, char_field='2', float_field=2),
+            models.TestModel(int_field=0, char_field="0", float_field=0),
+            models.TestModel(int_field=1, char_field="1", float_field=1),
+            models.TestModel(int_field=2, char_field="2", float_field=2),
         ],
-        ['int_field'],
-        ['char_field', 'float_field'],
+        ["int_field"],
+        ["char_field", "float_field"],
     )
 
-    for i, model_obj in enumerate(models.TestModel.objects.order_by('int_field')):
+    for i, model_obj in enumerate(models.TestModel.objects.order_by("int_field")):
         assert model_obj.int_field == i
         assert model_obj.char_field == str(i)
         assert model_obj.float_field == i  # almostequals
@@ -567,18 +567,18 @@ def test_upsert_update_fields_returning():
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
     test_models = [
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1) for i in range(3)
+        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1) for i in range(3)
     ]
 
     # Update using the int field as a uniqueness constraint
     results = pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=0, char_field='0', float_field=0),
-            models.TestModel(int_field=1, char_field='1', float_field=1),
-            models.TestModel(int_field=2, char_field='2', float_field=2),
+            models.TestModel(int_field=0, char_field="0", float_field=0),
+            models.TestModel(int_field=1, char_field="1", float_field=1),
+            models.TestModel(int_field=2, char_field="2", float_field=2),
         ],
-        ['int_field'],
+        ["int_field"],
         returning=True,
     )
 
@@ -586,7 +586,7 @@ def test_upsert_update_fields_returning():
     assert {u.id for u in results.updated} == {t.id for t in test_models}
     assert {u.int_field for u in results.updated} == {0, 1, 2}
     assert {u.float_field for u in results.updated} == {0, 1, 2}
-    assert {u.char_field for u in results.updated} == {'0', '1', '2'}
+    assert {u.char_field for u in results.updated} == {"0", "1", "2"}
 
 
 @pytest.mark.django_db
@@ -599,17 +599,17 @@ def test_upsert_no_update_fields_returning():
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
     for i in range(3):
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1)
+        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1)
 
     # Update using the int field as a uniqueness constraint
     results = pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=0, char_field='0', float_field=0),
-            models.TestModel(int_field=1, char_field='1', float_field=1),
-            models.TestModel(int_field=2, char_field='2', float_field=2),
+            models.TestModel(int_field=0, char_field="0", float_field=0),
+            models.TestModel(int_field=1, char_field="1", float_field=1),
+            models.TestModel(int_field=2, char_field="2", float_field=2),
         ],
-        ['int_field'],
+        ["int_field"],
         [],
         returning=True,
     )
@@ -626,18 +626,18 @@ def test_upsert_update_duplicate_fields_returning_none_updated():
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
     for i in range(3):
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1)
+        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1)
 
     # Update using the int field as a uniqueness constraint
     results = pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=0, char_field='-1', float_field=-1),
-            models.TestModel(int_field=1, char_field='-1', float_field=-1),
-            models.TestModel(int_field=2, char_field='-1', float_field=-1),
+            models.TestModel(int_field=0, char_field="-1", float_field=-1),
+            models.TestModel(int_field=1, char_field="-1", float_field=-1),
+            models.TestModel(int_field=2, char_field="-1", float_field=-1),
         ],
-        ['int_field'],
-        ['char_field', 'float_field'],
+        ["int_field"],
+        ["char_field", "float_field"],
         returning=True,
         ignore_duplicate_updates=True,
     )
@@ -655,25 +655,25 @@ def test_upsert_update_duplicate_fields_returning_some_updated():
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
     for i in range(3):
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1)
+        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1)
 
     # Update using the int field as a uniqueness constraint
     results = pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=0, char_field='-1', float_field=-1),
-            models.TestModel(int_field=1, char_field='-1', float_field=-1),
-            models.TestModel(int_field=2, char_field='0', float_field=-1),
+            models.TestModel(int_field=0, char_field="-1", float_field=-1),
+            models.TestModel(int_field=1, char_field="-1", float_field=-1),
+            models.TestModel(int_field=2, char_field="0", float_field=-1),
         ],
-        ['int_field'],
-        ['char_field', 'float_field'],
-        returning=['char_field'],
+        ["int_field"],
+        ["char_field", "float_field"],
+        returning=["char_field"],
         ignore_duplicate_updates=True,
     )
 
     assert list(results.created) == []
     assert len(list(results.updated)) == 1
-    assert list(results.updated)[0].char_field == '0'
+    assert list(results.updated)[0].char_field == "0"
 
 
 @pytest.mark.django_db
@@ -686,20 +686,20 @@ def test_upsert_update_duplicate_fields_returning_some_updated_untouched():
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
     for i in range(3):
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1)
+        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1)
 
     # Update using the int field as a uniqueness constraint
     results = pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=0, char_field='-1', float_field=-1),
-            models.TestModel(int_field=1, char_field='-1', float_field=-1),
-            models.TestModel(int_field=2, char_field='0', float_field=-1),
-            models.TestModel(int_field=3, char_field='3', float_field=3),
+            models.TestModel(int_field=0, char_field="-1", float_field=-1),
+            models.TestModel(int_field=1, char_field="-1", float_field=-1),
+            models.TestModel(int_field=2, char_field="0", float_field=-1),
+            models.TestModel(int_field=3, char_field="3", float_field=3),
         ],
-        ['int_field'],
-        ['char_field', 'float_field'],
-        returning=['char_field'],
+        ["int_field"],
+        ["char_field", "float_field"],
+        returning=["char_field"],
         ignore_duplicate_updates=True,
         return_untouched=True,
     )
@@ -707,8 +707,8 @@ def test_upsert_update_duplicate_fields_returning_some_updated_untouched():
     assert len(list(results.updated)) == 1
     assert len(list(results.untouched)) == 2
     assert len(list(results.created)) == 1
-    assert list(results.updated)[0].char_field == '0'
-    assert list(results.created)[0].char_field == '3'
+    assert list(results.updated)[0].char_field == "0"
+    assert list(results.created)[0].char_field == "3"
 
 
 @pytest.mark.django_db
@@ -722,20 +722,20 @@ def test_upsert_update_duplicate_fields_returning_some_updated_ignore_dups():
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
     for i in range(3):
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1)
+        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1)
 
     # Update using the int field as a uniqueness constraint
     results = pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=0, char_field='-1', float_field=-1),
-            models.TestModel(int_field=1, char_field='-1', float_field=-1),
-            models.TestModel(int_field=2, char_field='0', float_field=-1),
-            models.TestModel(int_field=3, char_field='3', float_field=3),
+            models.TestModel(int_field=0, char_field="-1", float_field=-1),
+            models.TestModel(int_field=1, char_field="-1", float_field=-1),
+            models.TestModel(int_field=2, char_field="0", float_field=-1),
+            models.TestModel(int_field=3, char_field="3", float_field=3),
         ],
-        ['int_field'],
-        ['char_field', 'float_field'],
-        returning=['char_field'],
+        ["int_field"],
+        ["char_field", "float_field"],
+        returning=["char_field"],
         ignore_duplicate_updates=False,
         return_untouched=True,
     )
@@ -743,7 +743,7 @@ def test_upsert_update_duplicate_fields_returning_some_updated_ignore_dups():
     assert len(list(results.untouched)) == 0
     assert len(list(results.updated)) == 3
     assert len(list(results.created)) == 1
-    assert list(results.created)[0].char_field == '3'
+    assert list(results.created)[0].char_field == "3"
 
 
 @pytest.mark.django_db
@@ -755,23 +755,23 @@ def test_upsert_all_updates_unique_int_field():
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
     for i in range(3):
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1)
+        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1)
 
     # Update using the int field as a uniqueness constraint
     pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=0, char_field='0', float_field=0),
-            models.TestModel(int_field=1, char_field='1', float_field=1),
-            models.TestModel(int_field=2, char_field='2', float_field=2),
+            models.TestModel(int_field=0, char_field="0", float_field=0),
+            models.TestModel(int_field=1, char_field="1", float_field=1),
+            models.TestModel(int_field=2, char_field="2", float_field=2),
         ],
-        ['int_field'],
-        ['char_field', 'float_field'],
+        ["int_field"],
+        ["char_field", "float_field"],
     )
 
     # Verify that the fields were updated
     assert models.TestModel.objects.count() == 3
-    for i, model_obj in enumerate(models.TestModel.objects.order_by('int_field')):
+    for i, model_obj in enumerate(models.TestModel.objects.order_by("int_field")):
         assert model_obj.int_field == i
         assert model_obj.char_field == str(i)
         assert model_obj.float_field == i  # almostequals
@@ -786,25 +786,25 @@ def test_upsert_all_updates_unique_int_field_update_float_field():
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
     for i in range(3):
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1)
+        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1)
 
     # Update using the int field as a uniqueness constraint
     pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=0, char_field='0', float_field=0),
-            models.TestModel(int_field=1, char_field='1', float_field=1),
-            models.TestModel(int_field=2, char_field='2', float_field=2),
+            models.TestModel(int_field=0, char_field="0", float_field=0),
+            models.TestModel(int_field=1, char_field="1", float_field=1),
+            models.TestModel(int_field=2, char_field="2", float_field=2),
         ],
-        ['int_field'],
-        update_fields=['float_field'],
+        ["int_field"],
+        update_fields=["float_field"],
     )
 
     # Verify that the float field was updated
     assert models.TestModel.objects.count() == 3
-    for i, model_obj in enumerate(models.TestModel.objects.order_by('int_field')):
+    for i, model_obj in enumerate(models.TestModel.objects.order_by("int_field")):
         assert model_obj.int_field == i
-        assert model_obj.char_field == '-1'
+        assert model_obj.char_field == "-1"
         assert model_obj.float_field == i  # almostequals
 
 
@@ -817,28 +817,28 @@ def test_upsert_some_updates_unique_int_field_update_float_field():
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
     for i in range(2):
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1)
+        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1)
 
     # Update using the int field as a uniqueness constraint. The first two
     # are updated while the third is created
     pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=0, char_field='0', float_field=0),
-            models.TestModel(int_field=1, char_field='1', float_field=1),
-            models.TestModel(int_field=2, char_field='2', float_field=2),
+            models.TestModel(int_field=0, char_field="0", float_field=0),
+            models.TestModel(int_field=1, char_field="1", float_field=1),
+            models.TestModel(int_field=2, char_field="2", float_field=2),
         ],
-        ['int_field'],
-        ['float_field'],
+        ["int_field"],
+        ["float_field"],
     )
 
     # Verify that the float field was updated for the first two models and
     # the char field was not updated for the first two. The char field,
     # however, should be '2' for the third model since it was created
     assert models.TestModel.objects.count() == 3
-    for i, model_obj in enumerate(models.TestModel.objects.order_by('int_field')):
+    for i, model_obj in enumerate(models.TestModel.objects.order_by("int_field")):
         assert model_obj.int_field == i
-        assert model_obj.char_field == '-1' if i < 2 else '2'
+        assert model_obj.char_field == "-1" if i < 2 else "2"
         assert model_obj.float_field == i  # almostequals
 
 
@@ -850,11 +850,11 @@ def test_upsert_some_updates_unique_timezone_field_update_float_field():
     """
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
-    for i in ['US/Eastern', 'US/Central']:
+    for i in ["US/Eastern", "US/Central"]:
         ddf.G(
             models.TestUniqueTzModel,
             time_zone=i,
-            char_field='-1',
+            char_field="-1",
             float_field=-1,
         )
 
@@ -863,27 +863,27 @@ def test_upsert_some_updates_unique_timezone_field_update_float_field():
     pgbulk.upsert(
         models.TestUniqueTzModel,
         [
-            models.TestModel(time_zone=timezone('US/Eastern'), char_field='0', float_field=0),
-            models.TestModel(time_zone=timezone('US/Central'), char_field='1', float_field=1),
-            models.TestModel(time_zone=timezone('UTC'), char_field='2', float_field=2),
+            models.TestModel(time_zone=timezone("US/Eastern"), char_field="0", float_field=0),
+            models.TestModel(time_zone=timezone("US/Central"), char_field="1", float_field=1),
+            models.TestModel(time_zone=timezone("UTC"), char_field="2", float_field=2),
         ],
-        ['time_zone'],
-        ['float_field'],
+        ["time_zone"],
+        ["float_field"],
     )
 
     # Verify that the float field was updated for the first two models and
     # the char field was not updated for the first two. The char field,
     # however, should be '2' for the third model since it was created
-    m1 = models.TestUniqueTzModel.objects.get(time_zone=timezone('US/Eastern'))
-    assert m1.char_field == '-1'
+    m1 = models.TestUniqueTzModel.objects.get(time_zone=timezone("US/Eastern"))
+    assert m1.char_field == "-1"
     assert m1.float_field == 0  # almostequals
 
-    m2 = models.TestUniqueTzModel.objects.get(time_zone=timezone('US/Central'))
-    assert m2.char_field == '-1'
+    m2 = models.TestUniqueTzModel.objects.get(time_zone=timezone("US/Central"))
+    assert m2.char_field == "-1"
     assert m2.float_field == 1  # almostequals
 
-    m3 = models.TestUniqueTzModel.objects.get(time_zone=timezone('UTC'))
-    assert m3.char_field == '2'
+    m3 = models.TestUniqueTzModel.objects.get(time_zone=timezone("UTC"))
+    assert m3.char_field == "2"
     assert m3.float_field == 2  # almostequals
 
 
@@ -903,19 +903,19 @@ def test_upsert_some_updates_unique_int_char_field_update_float_field():
     pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=0, char_field='0', float_field=0),
-            models.TestModel(int_field=1, char_field='1', float_field=1),
-            models.TestModel(int_field=2, char_field='2', float_field=2),
+            models.TestModel(int_field=0, char_field="0", float_field=0),
+            models.TestModel(int_field=1, char_field="1", float_field=1),
+            models.TestModel(int_field=2, char_field="2", float_field=2),
         ],
-        ['int_field', 'char_field'],
-        ['float_field'],
+        ["int_field", "char_field"],
+        ["float_field"],
     )
 
     # Verify that the float field was updated for the first two models and
     # the char field was not updated for the first two. The char field,
     # however, should be '2' for the third model since it was created
     assert models.TestModel.objects.count() == 3
-    for i, model_obj in enumerate(models.TestModel.objects.order_by('int_field')):
+    for i, model_obj in enumerate(models.TestModel.objects.order_by("int_field")):
         assert model_obj.int_field == i
         assert model_obj.char_field == str(i)
         assert model_obj.float_field == i  # almostequals
@@ -931,33 +931,33 @@ def test_upsert_no_updates_unique_int_char_field():
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
     for i in range(3):
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1)
+        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1)
 
     # Update using the int and char field as a uniqueness constraint. All
     # three objects are created
     pgbulk.upsert(
         models.TestModel,
         [
-            models.TestModel(int_field=3, char_field='0', float_field=0),
-            models.TestModel(int_field=4, char_field='1', float_field=1),
-            models.TestModel(int_field=5, char_field='2', float_field=2),
+            models.TestModel(int_field=3, char_field="0", float_field=0),
+            models.TestModel(int_field=4, char_field="1", float_field=1),
+            models.TestModel(int_field=5, char_field="2", float_field=2),
         ],
-        ['int_field', 'char_field'],
-        ['float_field'],
+        ["int_field", "char_field"],
+        ["float_field"],
     )
 
     # Verify that no updates occured
     assert models.TestModel.objects.count() == 6
-    assert models.TestModel.objects.filter(char_field='-1').count() == 3
+    assert models.TestModel.objects.filter(char_field="-1").count() == 3
     for i, model_obj in enumerate(
-        models.TestModel.objects.filter(char_field='-1').order_by('int_field')
+        models.TestModel.objects.filter(char_field="-1").order_by("int_field")
     ):
         assert model_obj.int_field == i
-        assert model_obj.char_field == '-1'
+        assert model_obj.char_field == "-1"
         assert model_obj.float_field == -1  # almostequals
-    assert models.TestModel.objects.exclude(char_field='-1').count() == 3
+    assert models.TestModel.objects.exclude(char_field="-1").count() == 3
     for i, model_obj in enumerate(
-        models.TestModel.objects.exclude(char_field='-1').order_by('int_field')
+        models.TestModel.objects.exclude(char_field="-1").order_by("int_field")
     ):
         assert model_obj.int_field == i + 3
         assert model_obj.char_field == str(i)
@@ -973,29 +973,29 @@ def test_upsert_some_updates_unique_int_char_field_queryset():
     # Create previously stored test models with a unique int field and -1
     # for all other fields
     for i in range(3):
-        ddf.G(models.TestModel, int_field=i, char_field='-1', float_field=-1)
+        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1)
 
     # Update using the int field as a uniqueness constraint on a queryset.
     # Only one object should be updated.
     pgbulk.upsert(
         models.TestModel.objects.filter(int_field=0),
         [
-            models.TestModel(int_field=0, char_field='0', float_field=0),
-            models.TestModel(int_field=4, char_field='1', float_field=1),
-            models.TestModel(int_field=5, char_field='2', float_field=2),
+            models.TestModel(int_field=0, char_field="0", float_field=0),
+            models.TestModel(int_field=4, char_field="1", float_field=1),
+            models.TestModel(int_field=5, char_field="2", float_field=2),
         ],
-        ['int_field'],
-        ['float_field'],
+        ["int_field"],
+        ["float_field"],
     )
 
     # Verify that two new objecs were created
     assert models.TestModel.objects.count() == 5
-    assert models.TestModel.objects.filter(char_field='-1').count() == 3
+    assert models.TestModel.objects.filter(char_field="-1").count() == 3
     for i, model_obj in enumerate(
-        models.TestModel.objects.filter(char_field='-1').order_by('int_field')
+        models.TestModel.objects.filter(char_field="-1").order_by("int_field")
     ):
         assert model_obj.int_field == i
-        assert model_obj.char_field == '-1'
+        assert model_obj.char_field == "-1"
 
 
 @pytest.mark.django_db
@@ -1003,7 +1003,7 @@ def test_update_foreign_key_by_id():
     t_model = ddf.G(models.TestModel)
     t_fk_model = ddf.G(models.TestForeignKeyModel)
     t_fk_model.test_model = t_model
-    pgbulk.update(models.TestForeignKeyModel, [t_fk_model], ['test_model_id'])
+    pgbulk.update(models.TestForeignKeyModel, [t_fk_model], ["test_model_id"])
     assert models.TestForeignKeyModel.objects.get().test_model == t_model
 
 
@@ -1012,7 +1012,7 @@ def test_update_foreign_key_by_name():
     t_model = ddf.G(models.TestModel)
     t_fk_model = ddf.G(models.TestForeignKeyModel)
     t_fk_model.test_model = t_model
-    pgbulk.update(models.TestForeignKeyModel, [t_fk_model], ['test_model'])
+    pgbulk.update(models.TestForeignKeyModel, [t_fk_model], ["test_model"])
     assert models.TestForeignKeyModel.objects.get().test_model == t_model
 
 
@@ -1022,14 +1022,14 @@ def test_update_foreign_key_pk_using_id():
     Tests a bulk update on a model that has a primary key to a foreign key.
     It uses the id of the pk in the update
     """
-    t = ddf.G(models.TestPkForeignKey, char_field='hi')
+    t = ddf.G(models.TestPkForeignKey, char_field="hi")
     pgbulk.update(
         models.TestPkForeignKey,
-        [models.TestPkForeignKey(my_key_id=t.my_key_id, char_field='hello')],
-        ['char_field'],
+        [models.TestPkForeignKey(my_key_id=t.my_key_id, char_field="hello")],
+        ["char_field"],
     )
     assert models.TestPkForeignKey.objects.count() == 1
-    assert models.TestPkForeignKey.objects.filter(char_field='hello', my_key=t.my_key).exists()
+    assert models.TestPkForeignKey.objects.filter(char_field="hello", my_key=t.my_key).exists()
 
 
 @pytest.mark.django_db
@@ -1038,14 +1038,14 @@ def test_update_foreign_key_pk():
     Tests a bulk update on a model that has a primary key to a foreign key.
     It uses the foreign key itself in the update
     """
-    t = ddf.G(models.TestPkForeignKey, char_field='hi')
+    t = ddf.G(models.TestPkForeignKey, char_field="hi")
     pgbulk.update(
         models.TestPkForeignKey,
-        [models.TestPkForeignKey(my_key=t.my_key, char_field='hello')],
-        ['char_field'],
+        [models.TestPkForeignKey(my_key=t.my_key, char_field="hello")],
+        ["char_field"],
     )
     assert models.TestPkForeignKey.objects.count() == 1
-    assert models.TestPkForeignKey.objects.filter(char_field='hello', my_key=t.my_key).exists()
+    assert models.TestPkForeignKey.objects.filter(char_field="hello", my_key=t.my_key).exists()
 
 
 @pytest.mark.django_db
@@ -1053,14 +1053,14 @@ def test_update_char_pk():
     """
     Tests a bulk update on a model that has a primary key to a char field.
     """
-    ddf.G(models.TestPkChar, char_field='hi', my_key='1')
+    ddf.G(models.TestPkChar, char_field="hi", my_key="1")
     pgbulk.update(
         models.TestPkChar,
-        [models.TestPkChar(my_key='1', char_field='hello')],
-        ['char_field'],
+        [models.TestPkChar(my_key="1", char_field="hello")],
+        ["char_field"],
     )
     assert models.TestPkChar.objects.count() == 1
-    assert models.TestPkChar.objects.filter(char_field='hello', my_key='1').exists()
+    assert models.TestPkChar.objects.filter(char_field="hello", my_key="1").exists()
 
 
 @pytest.mark.django_db
@@ -1103,7 +1103,7 @@ def test_update_floats_to_null():
     test_obj_1.float_field = None
     test_obj_2.float_field = None
 
-    pgbulk.update(models.TestModel, [test_obj_1, test_obj_2], ['float_field'])
+    pgbulk.update(models.TestModel, [test_obj_1, test_obj_2], ["float_field"])
 
     test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
     test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
@@ -1121,7 +1121,7 @@ def test_update_ints_to_null():
     test_obj_1.int_field = None
     test_obj_2.int_field = None
 
-    pgbulk.update(models.TestModel, [test_obj_1, test_obj_2], ['int_field'])
+    pgbulk.update(models.TestModel, [test_obj_1, test_obj_2], ["int_field"])
 
     test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
     test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
@@ -1134,12 +1134,12 @@ def test_update_chars_to_null():
     """
     Tests updating a char field to a null field.
     """
-    test_obj_1 = ddf.G(models.TestModel, int_field=1, char_field='2')
-    test_obj_2 = ddf.G(models.TestModel, int_field=2, char_field='3')
+    test_obj_1 = ddf.G(models.TestModel, int_field=1, char_field="2")
+    test_obj_2 = ddf.G(models.TestModel, int_field=2, char_field="3")
     test_obj_1.char_field = None
     test_obj_2.char_field = None
 
-    pgbulk.update(models.TestModel, [test_obj_1, test_obj_2], ['char_field'])
+    pgbulk.update(models.TestModel, [test_obj_1, test_obj_2], ["char_field"])
 
     test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
     test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
@@ -1178,7 +1178,7 @@ def test_update_objs_one_field_to_update():
     test_obj_1.int_field = 3
     test_obj_2.int_field = 4
     # Do a bulk update with the int fields
-    pgbulk.update(models.TestModel, [test_obj_1, test_obj_2], ['int_field'])
+    pgbulk.update(models.TestModel, [test_obj_1, test_obj_2], ["int_field"])
     # The test objects int fields should be untouched
     test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
     test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
@@ -1201,7 +1201,7 @@ def test_update_objs_one_field_to_update_ignore_other_field():
     test_obj_1.float_field = 3.0
     test_obj_2.float_field = 4.0
     # Do a bulk update with the int fields
-    pgbulk.update(models.TestModel, [test_obj_1, test_obj_2], ['int_field'])
+    pgbulk.update(models.TestModel, [test_obj_1, test_obj_2], ["int_field"])
     # The test objects int fields should be untouched
     test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
     test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
@@ -1228,7 +1228,7 @@ def test_update_objs_two_fields_to_update():
     pgbulk.update(
         models.TestModel,
         [test_obj_1, test_obj_2],
-        ['int_field', 'float_field'],
+        ["int_field", "float_field"],
     )
     # The test objects int fields should be untouched
     test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
@@ -1249,29 +1249,29 @@ def test_update_objects_with_custom_db_field_types():
         models.TestModel,
         int_field=1,
         float_field=1.0,
-        json_field={'test': 'test'},
-        array_field=['one', 'two'],
+        json_field={"test": "test"},
+        array_field=["one", "two"],
     )
     test_obj_2 = ddf.G(
         models.TestModel,
         int_field=2,
         float_field=2.0,
-        json_field={'test2': 'test2'},
-        array_field=['three', 'four'],
+        json_field={"test2": "test2"},
+        array_field=["three", "four"],
     )
 
     # Change the fields on the models
-    test_obj_1.json_field = {'test': 'updated'}
-    test_obj_1.array_field = ['one', 'two', 'updated']
+    test_obj_1.json_field = {"test": "updated"}
+    test_obj_1.array_field = ["one", "two", "updated"]
 
-    test_obj_2.json_field = {'test2': 'updated'}
-    test_obj_2.array_field = ['three', 'four', 'updated']
+    test_obj_2.json_field = {"test2": "updated"}
+    test_obj_2.array_field = ["three", "four", "updated"]
 
     # Do a bulk update with the int fields
     pgbulk.update(
         models.TestModel,
         [test_obj_1, test_obj_2],
-        ['json_field', 'array_field'],
+        ["json_field", "array_field"],
     )
 
     # Refetch the objects
@@ -1279,9 +1279,9 @@ def test_update_objects_with_custom_db_field_types():
     test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
 
     # Assert that the json field was updated
-    assert test_obj_1.json_field == {'test': 'updated'}
-    assert test_obj_2.json_field == {'test2': 'updated'}
+    assert test_obj_1.json_field == {"test": "updated"}
+    assert test_obj_2.json_field == {"test2": "updated"}
 
     # Assert that the array field was updated
-    assert test_obj_1.array_field, ['one', 'two' == 'updated']
-    assert test_obj_2.array_field, ['three', 'four' == 'updated']
+    assert test_obj_1.array_field, ["one", "two" == "updated"]
+    assert test_obj_2.array_field, ["three", "four" == "updated"]

@@ -1,4 +1,8 @@
 # Changelog
+## 1.2.3 (2022-08-20)
+### Trivial
+  - Fix release note rendering and code formatting changes [Wes Kendall, 94f1192]
+
 ## 1.2.2 (2022-08-17)
 ### Trivial
   - README and intro documentation fix [Wes Kendall, e75930e]

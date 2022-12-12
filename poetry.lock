@@ -629,7 +629,7 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "poetry-core"
-version = "1.1.0rc3"
+version = "1.3.2"
 description = "Poetry PEP 517 Build Backend"
 category = "dev"
 optional = false
@@ -1187,7 +1187,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7.0,<4"
-content-hash = "3356e857fe67810cff955b888d245078ecca917daa49a9df192840acb93bd240"
+content-hash = "0f15996c6dd7dd2205d3f6291412118fd286c21f8c06ac45c729e154b8e8a13e"
 
 [metadata.files]
 alabaster = [
@@ -1507,8 +1507,8 @@ pluggy = [
     {file = "pluggy-1.0.0.tar.gz", hash = "sha256:4224373bacce55f955a878bf9cfa763c1e360858e330072059e10bad68531159"},
 ]
 poetry-core = [
-    {file = "poetry-core-1.1.0rc3.tar.gz", hash = "sha256:c20547164b90edfe5ceff8728d0646b161f28bf830cd5c6a61b91a898fd2b710"},
-    {file = "poetry_core-1.1.0rc3-py3-none-any.whl", hash = "sha256:8d8e2e958c566b1579fd99670a5b46b3a31c3e5c4c44009550a9639e4ecfe8d8"},
+    {file = "poetry-core-1.3.2.tar.gz", hash = "sha256:0ab006a40cb38d6a38b97264f6835da2f08a96912f2728ce668e9ac6a34f686f"},
+    {file = "poetry_core-1.3.2-py3-none-any.whl", hash = "sha256:ea0f5a90b339cde132b4e43cff78a1b440cd928db864bb67cfc97fdfcefe7218"},
 ]
 poyo = [
     {file = "poyo-0.5.0-py2.py3-none-any.whl", hash = "sha256:3e2ca8e33fdc3c411cd101ca395668395dd5dc7ac775b8e809e3def9f9fe041a"},

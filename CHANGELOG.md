@@ -1,4 +1,14 @@
 # Changelog
+## 1.3.0 (2022-12-12)
+### Feature
+  - Sort bulk update objects [Wesley Kendall, f766617]
+
+    Objects passed to ``pgbulk.update`` are now sorted to reduce the likelihood of
+    a deadlock when executed concurrently.
+### Trivial
+  - Updated with latest Python template [Wesley Kendall, 9652cd2]
+  - Updated with latest Django template [Wesley Kendall, 6ef27e6]
+
 ## 1.2.6 (2022-08-26)
 ### Trivial
   - Test against Django 4.1 and other CI improvements [Wes Kendall, 9eedff4]

@@ -445,6 +445,9 @@ def update(queryset, model_objs, update_fields=None):
     model = queryset.model
     update_fields = _get_update_fields(queryset, update_fields)
 
+    # Sort the model objects to reduce the likelihood of deadlocks
+    model_objs = sorted(model_objs, key=lambda obj: obj.pk)
+
     # Add the pk to the value fields so we can join during the update
     value_fields = [model._meta.pk.attname] + update_fields
 

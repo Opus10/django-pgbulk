@@ -1083,7 +1083,7 @@ def test_update_no_fields_given():
     test_obj_2.int_field = 9
     test_obj_2.float_field = 10
 
-    pgbulk.update(models.TestModel, [test_obj_1, test_obj_2])
+    pgbulk.update(models.TestModel, [test_obj_2, test_obj_1])
 
     test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
     test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)

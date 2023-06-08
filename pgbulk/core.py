@@ -1,11 +1,52 @@
 from collections import namedtuple, UserString
 import itertools
 
+from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
 from django.db import models
 from django.db.models.sql.compiler import SQLCompiler
 from django.utils import timezone
-from psycopg2.extensions import AsIs
+from django.utils.version import get_version_tuple
+
+
+def _psycopg_version():
+    try:
+        import psycopg as Database
+    except ImportError:
+        import psycopg2 as Database
+    except ImportError:  # pragma: no cover
+        raise ImproperlyConfigured("Error loading psycopg2 or psycopg module")
+
+    version_tuple = get_version_tuple(Database.__version__.split(" ", 1)[0])
+
+    if version_tuple[0] not in (2, 3):  # pragma: no cover
+        raise ImproperlyConfigured(f"Pysocpg version {version_tuple[0]} not supported")
+
+    return version_tuple
+
+
+psycopg_version = _psycopg_version()
+psycopg_maj_version = psycopg_version[0]
+
+
+if psycopg_maj_version == 2:
+    from psycopg2.extensions import AsIs as Literal
+elif psycopg_maj_version == 3:
+    import psycopg.adapt
+
+    class Literal:  # pragma: no cover
+        def __init__(self, val):
+            self.val = val
+
+    class LiteralDumper(psycopg.adapt.Dumper):  # pragma: no cover
+        def dump(self, obj):
+            return obj.val.encode("utf-8")
+
+        def quote(self, obj):
+            return self.dump(obj)
+
+else:
+    raise AssertionError
 
 
 class UpdateField(UserString):
@@ -94,10 +135,13 @@ def _fill_auto_fields(queryset, values):
 
 
 def _prep_sql_args(queryset, connection, cursor, sql_args):
+    if psycopg_maj_version == 3:
+        cursor.adapters.register_dumper(Literal, LiteralDumper)
+
     compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)
 
     return [
-        AsIs(cursor.mogrify(*sql_arg.as_sql(compiler, connection)).decode("utf-8"))
+        Literal(cursor.mogrify(*sql_arg.as_sql(compiler, connection)).decode("utf-8"))
         if hasattr(sql_arg, "as_sql")
         else sql_arg
         for sql_arg in sql_args
@@ -221,9 +265,11 @@ def _get_upsert_sql(
         with connection.cursor() as cursor:
             for field_name, expr in update_expressions.items():
                 expr = expr.resolve_expression(queryset.query, allow_joins=False, for_save=True)
-                update_fields_expressions[
-                    model._meta.get_field(field_name).column
-                ] = cursor.mogrify(*expr.as_sql(compiler, connection)).decode("utf-8")
+                val = cursor.mogrify(*expr.as_sql(compiler, connection))
+                if isinstance(val, bytes):  # Psycopg 2/3 return different types
+                    val = val.decode("utf-8")
+
+                update_fields_expressions[model._meta.get_field(field_name).column] = val
 
     update_fields_sql = ", ".join(
         f"{_quote(field.column)} = {update_fields_expressions[field.column]}"

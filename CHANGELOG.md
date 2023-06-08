@@ -1,4 +1,10 @@
 # Changelog
+## 1.4.0 (2023-06-08)
+### Feature
+  - Added Python 3.11, Django 4.2, and Psycopg 3 support [Wesley Kendall, f606b0b]
+
+    Adds Python 3.11, Django 4.2, and Psycopg 3 support along with tests for multiple Postgres versions. Drops support for Django 2.2.
+
 ## 1.3.0 (2022-12-12)
 ### Feature
   - Sort bulk update objects [Wesley Kendall, f766617]

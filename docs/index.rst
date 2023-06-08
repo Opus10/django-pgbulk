@@ -18,6 +18,11 @@ provides several optimized bulk operations for Postgres:
    upsert and also deletes any rows in the source queryset that were not
    part of the input data.
 
+Compatibility
+-------------
+
+``django-pgbulk`` is compatible with Python 3.7 -- 3.11, Django 3.2 -- 4.2, Psycopg 2 -- 3 and Postgres 12 -- 15.
+
 
 pgbulk.update
 -------------

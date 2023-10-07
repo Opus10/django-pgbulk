@@ -1,5 +1,4 @@
 from django.contrib.postgres.fields import ArrayField
-from django.contrib.postgres.fields import JSONField
 from django.db import models
 from timezone_field import TimeZoneField
 
@@ -25,7 +24,7 @@ class TestModel(models.Model):
     int_field = models.IntegerField(null=True, unique=True)
     char_field = models.CharField(max_length=128, null=True)
     float_field = models.FloatField(null=True)
-    json_field = JSONField(default=dict)
+    json_field = models.JSONField(default=dict)
     array_field = ArrayField(models.CharField(max_length=128), default=list)
     time_zone = TimeZoneField(default="UTC")
 
@@ -72,7 +71,7 @@ class TestPkForeignKey(models.Model):
     A test model with a primary key thats a foreign key to another model.
     """
 
-    my_key = models.ForeignKey(TestModel, primary_key=True, on_delete=models.CASCADE)
+    my_key = models.OneToOneField(TestModel, primary_key=True, on_delete=models.CASCADE)
     char_field = models.CharField(max_length=128, null=True)
 
 

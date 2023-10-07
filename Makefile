@@ -4,11 +4,10 @@
 #
 # setup - Sets up the development environment
 # dependencies - Installs dependencies
-# clean-docs - Clean the documentation folder
-# open-docs - Open any docs generated with "make docs"
-# docs - Generated sphinx docs
+# docs - Build docs
+# docs-serve - Serve live documentation
 # lint - Run code linting and static checks
-# format - Format code using black
+# lint-fix - Fix common linting errors
 # test - Run tests using pytest
 # full-test-suite - Run full test suite using tox
 # shell - Run a shell in a virtualenv
@@ -52,7 +51,7 @@ ifndef run
 	      "    tox: Run tests against all versions of Python\n"\
 	      "    lint: Run code linting and static checks\n"\
 	      "    format: Format code using Black\n"\
-	      "    docs: Build Sphinx documentation\n"\
+	      "    docs: Serve documentation\n"\
 	      "    open-docs: Open built documentation\n"\
 	      "    docker-teardown: Spin down docker resources\n"\
 	      "\n"\
@@ -141,37 +140,32 @@ full-test-suite:
 	$(EXEC_WRAPPER) tox -p 2
 
 
-# Clean the documentation folder
-.PHONY: clean-docs
-clean-docs:
-	-$(EXEC_WRAPPER) bash -c 'cd docs && make clean'
-
-
-# Open the build docs (only works on Mac)
-.PHONY: open-docs
-open-docs:
-ifeq (${OS}, Darwin)
-	open docs/_build/html/index.html
-else ifeq (${OS}, Linux)
-	xdg-open docs/_build/html/index.html
-else
-	@echo "Open 'docs/_build/html/index.html' to view docs"
-endif
-
-
-# Build Sphinx autodocs
+# Serve docs
 .PHONY: docs
-docs: clean-docs  # Ensure docs are clean, otherwise weird render errors can result
-	$(EXEC_WRAPPER) bash -c 'cd docs && make html'
+docs-serve:
+	$(EXEC_WRAPPER) mkdocs serve
+
+
+# Build docs
+.PHONY: docs
+docs:
+	$(EXEC_WRAPPER) mkdocs build -s
 
 
 # Run code linting and static analysis. Ensure docs can be built
 .PHONY: lint
 lint:
 	$(EXEC_WRAPPER) black . --check
-	$(EXEC_WRAPPER) flake8 -v ${MODULE_NAME}
+	$(EXEC_WRAPPER) ruff check ${MODULE_NAME}
 	$(EXEC_WRAPPER) footing update --check
-	$(EXEC_WRAPPER) bash -c 'cd docs && make html'
+	$(EXEC_WRAPPER) bash -c 'make docs'
+
+
+# Auto-fix lint errors
+.PHONY: lint-fix
+lint-fix:
+	$(EXEC_WRAPPER) black .
+	$(EXEC_WRAPPER) ruff check ${MODULE_NAME} --fix
 
 
 # Lint commit messages
@@ -191,8 +185,3 @@ tidy-commit:
 tidy-squash:
 	$(EXEC_WRAPPER) git tidy-squash origin/master
 
-
-# Format code with black
-.PHONY: format
-format:
-	$(EXEC_WRAPPER) black .

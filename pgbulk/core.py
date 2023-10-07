@@ -1,9 +1,10 @@
-from collections import namedtuple, UserString
 import itertools
+from collections import UserString, namedtuple
+from typing import List, Union
 
+from asgiref.sync import sync_to_async
 from django.core.exceptions import ImproperlyConfigured
-from django.db import connections
-from django.db import models
+from django.db import connections, models
 from django.db.models.sql.compiler import SQLCompiler
 from django.utils import timezone
 from django.utils.version import get_version_tuple
@@ -11,11 +12,11 @@ from django.utils.version import get_version_tuple
 
 def _psycopg_version():
     try:
-        import psycopg as Database
+        import psycopg as Database  # type: ignore
     except ImportError:
         import psycopg2 as Database
-    except ImportError:  # pragma: no cover
-        raise ImproperlyConfigured("Error loading psycopg2 or psycopg module")
+    except Exception as exc:  # pragma: no cover
+        raise ImproperlyConfigured("Error loading psycopg2 or psycopg module") from exc
 
     version_tuple = get_version_tuple(Database.__version__.split(" ", 1)[0])
 
@@ -50,34 +51,52 @@ else:
 
 
 class UpdateField(UserString):
-    def __init__(self, field, expression=None):
+    """
+    For expressing an update field as an expression to an upsert
+    operation.
+
+    Example:
+
+        results = pgbulk.upsert(
+            MyModel,
+            [
+                MyModel(some_int_field=0, some_key="a"),
+                MyModel(some_int_field=0, some_key="b")
+            ],
+            ["some_key"],
+            [
+                pgbulk.UpdateField(
+                    "some_int_field",
+                    expression=models.F('some_int_field') + 1
+                )
+            ],
+        )
+    """
+
+    def __init__(self, field: str, expression: Union[models.Expression, None] = None):
         self.data = field
         self.expression = expression
 
 
 class UpsertResult(list):
     """
-    Returned by the upsert operation.
+    Returned by [pgbulk.upsert][] when the `returning` argument is provided.
 
-    Wraps a list and provides properties to access created, updated,
-    untouched, and deleted elements
+    Wraps a list of named tuples where the names correspond to the underlying
+    Django model attribute names.
+
+    Also provides properties to access created and updated rows.
     """
 
     @property
-    def created(self):
-        return (i for i in self if i.status_ == "c")
+    def created(self) -> List[namedtuple]:
+        """Return the created rows"""
+        return [i for i in self if i.status_ == "c"]
 
     @property
-    def updated(self):
-        return (i for i in self if i.status_ == "u")
-
-    @property
-    def untouched(self):
-        return (i for i in self if i.status_ == "n")
-
-    @property
-    def deleted(self):
-        return (i for i in self if i.status_ == "d")
+    def updated(self) -> List[namedtuple]:
+        """Return the updated rows"""
+        return [i for i in self if i.status_ == "u"]
 
 
 def _quote(field):
@@ -206,17 +225,9 @@ def _get_values_for_rows(queryset, model_objs, all_fields):
     return row_values, sql_args
 
 
-def _get_return_fields_sql(returning, return_status=False, alias=None):
-    if alias:
-        return_fields_sql = ", ".join(
-            "{0}.{1}".format(alias, _quote(field)) for field in returning
-        )
-    else:
-        return_fields_sql = ", ".join(_quote(field) for field in returning)
-
-    if return_status:
-        return_fields_sql += ", CASE WHEN xmax = 0 THEN 'c' ELSE 'u' END AS status_"
-
+def _get_return_fields_sql(returning):
+    return_fields_sql = ", ".join(_quote(field) for field in returning)
+    return_fields_sql += ", CASE WHEN xmax = 0 THEN 'c' ELSE 'u' END AS status_"
     return return_fields_sql
 
 
@@ -226,8 +237,7 @@ def _get_upsert_sql(
     unique_fields,
     update_fields,
     returning,
-    ignore_duplicate_updates=True,
-    return_untouched=False,
+    redundant_updates=False,
 ):
     """
     Generates the postgres specific sql necessary to perform an upsert
@@ -276,11 +286,9 @@ def _get_upsert_sql(
         for field in update_fields
     )
 
-    return_sql = (
-        "RETURNING " + _get_return_fields_sql(returning, return_status=True) if returning else ""
-    )
+    return_sql = "RETURNING " + _get_return_fields_sql(returning) if returning else ""
     ignore_duplicates_sql = ""
-    if ignore_duplicate_updates:
+    if not redundant_updates:
         ignore_duplicates_sql = (
             " WHERE ({update_fields_sql}) IS DISTINCT FROM ({excluded_update_fields_sql}) "
         ).format(
@@ -297,52 +305,19 @@ def _get_upsert_sql(
         else "DO NOTHING"
     )
 
-    if return_untouched:
-        row_values_sql = ", ".join(
-            ["('{0}', {1})".format(i, row_value[1:-1]) for i, row_value in enumerate(row_values)]
-        )
-        sql = (
-            ' WITH input_rows("temp_id_", {all_field_names_sql}) AS ('
-            "     VALUES {row_values_sql}"
-            " ), ins AS ( "
-            "     INSERT INTO {table_name} ({all_field_names_sql})"
-            "     SELECT {all_field_names_sql} FROM input_rows ORDER BY temp_id_"
-            "     ON CONFLICT ({unique_field_names_sql}) {on_conflict} {return_sql}"
-            " )"
-            " SELECT DISTINCT ON ({table_pk_name}) * FROM ("
-            "     SELECT status_, {return_fields_sql}"
-            "     FROM   ins"
-            "     UNION  ALL"
-            "     SELECT 'n' AS status_, {aliased_return_fields_sql}"
-            "     FROM input_rows"
-            "     JOIN {table_name} c USING ({unique_field_names_sql})"
-            " ) as results"
-            " ORDER BY results.\"{table_pk_name}\", CASE WHEN(status_ = 'n') THEN 1 ELSE 0 END;"
-        ).format(
-            all_field_names_sql=all_field_names_sql,
-            row_values_sql=row_values_sql,
-            table_name=model._meta.db_table,
-            unique_field_names_sql=unique_field_names_sql,
-            on_conflict=on_conflict,
-            return_sql=return_sql,
-            table_pk_name=model._meta.pk.name,
-            return_fields_sql=_get_return_fields_sql(returning),
-            aliased_return_fields_sql=_get_return_fields_sql(returning, alias="c"),
-        )
-    else:
-        row_values_sql = ", ".join(row_values)
-        sql = (
-            " INSERT INTO {table_name} ({all_field_names_sql})"
-            " VALUES {row_values_sql}"
-            " ON CONFLICT ({unique_field_names_sql}) {on_conflict} {return_sql}"
-        ).format(
-            table_name=model._meta.db_table,
-            all_field_names_sql=all_field_names_sql,
-            row_values_sql=row_values_sql,
-            unique_field_names_sql=unique_field_names_sql,
-            on_conflict=on_conflict,
-            return_sql=return_sql,
-        )
+    row_values_sql = ", ".join(row_values)
+    sql = (
+        " INSERT INTO {table_name} ({all_field_names_sql})"
+        " VALUES {row_values_sql}"
+        " ON CONFLICT ({unique_field_names_sql}) {on_conflict} {return_sql}"
+    ).format(
+        table_name=model._meta.db_table,
+        all_field_names_sql=all_field_names_sql,
+        row_values_sql=row_values_sql,
+        unique_field_names_sql=unique_field_names_sql,
+        on_conflict=on_conflict,
+        return_sql=return_sql,
+    )
 
     return sql, sql_args
 
@@ -353,22 +328,13 @@ def _fetch(
     unique_fields,
     update_fields,
     returning,
-    sync,
-    ignore_duplicate_updates=True,
-    return_untouched=False,
+    redundant_updates=False,
 ):
     """
-    Perfom the upsert and do an optional sync operation
+    Perfom the upsert
     """
-    model = queryset.model
     connection = connections[queryset.db]
-    if (return_untouched or sync) and returning is not True:
-        returning = set(returning) if returning else set()
-        returning.add(model._meta.pk.name)
     upserted = []
-    deleted = []
-    # We must return untouched rows when doing a sync operation
-    return_untouched = True if sync else return_untouched
 
     if model_objs:
         sql, sql_args = _get_upsert_sql(
@@ -377,8 +343,7 @@ def _fetch(
             unique_fields,
             update_fields,
             returning,
-            ignore_duplicate_updates=ignore_duplicate_updates,
-            return_untouched=return_untouched,
+            redundant_updates=redundant_updates,
         )
 
         with connection.cursor() as cursor:
@@ -388,16 +353,7 @@ def _fetch(
                 nt_result = namedtuple("Result", [col[0] for col in cursor.description])
                 upserted = [nt_result(*row) for row in cursor.fetchall()]
 
-    pk_field = model._meta.pk.name
-    if sync:
-        orig_ids = queryset.values_list(pk_field, flat=True)
-        deleted = set(orig_ids) - {getattr(r, pk_field) for r in upserted}
-        model.objects.filter(pk__in=deleted).delete()
-
-    nt_deleted_result = namedtuple("DeletedResult", [model._meta.pk.name, "status_"])
-    return UpsertResult(
-        upserted + [nt_deleted_result(**{pk_field: d, "status_": "d"}) for d in deleted]
-    )
+    return UpsertResult(upserted)
 
 
 def _upsert(
@@ -406,38 +362,29 @@ def _upsert(
     unique_fields,
     update_fields=None,
     returning=False,
-    sync=False,
-    ignore_duplicate_updates=True,
-    return_untouched=False,
+    redundant_updates=False,
 ):
     """
-    Perform a bulk upsert on a table, optionally syncing the results.
+    Perform a bulk upsert on a table
 
     Args:
         queryset (Model|QuerySet): A model or a queryset that defines the
-            collection to sync
-        model_objs (List[Model]): A list of Django models to sync. All models
-            in this list will be bulk upserted and any models not in the table
-            (or queryset) will be deleted if sync=True.
+            collection to upsert.
+        model_objs (List[Model]): A list of Django models to upsert.
         unique_fields (List[str]): A list of fields that define the uniqueness
             of the model. The model must have a unique constraint on these
-            fields
+            fields.
         update_fields (List[str], default=None): A list of fields to update
             whenever objects already exist. If an empty list is provided, it
             is equivalent to doing a bulk insert on the objects that don't
             exist. If `None`, all fields will be updated. If you want to
-            perform an expression such as an ``F`` object on a field when
-            it is updated, use the ``pgbulk.UpdateField`` class. See
+            perform an expression such as an `F` object on a field when
+            it is updated, use the [pgbulk.UpdateField][] class. See
             examples below.
         returning (bool|List[str]): If True, returns all fields. If a list,
-            only returns fields in the list
-        sync (bool, default=False): Perform a sync operation on the queryset
-        ignore_duplicate_updates (bool, default=True): Don't perform an update
+            only returns fields in the list.
+        redundant_updates (bool, default=False): Don't perform an update
             if all columns are identical to the row in the database.
-        return_untouched (bool, default=False): When
-            ``ignore_duplicate_updates`` is ``True``, untouched rows will not
-            be returned in upsert results. Set this to ``True`` to return
-            untouched rows.
     """
     queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
 
@@ -454,21 +401,23 @@ def _upsert(
         unique_fields,
         update_fields,
         returning,
-        sync,
-        ignore_duplicate_updates=ignore_duplicate_updates,
-        return_untouched=return_untouched,
+        redundant_updates=redundant_updates,
     )
 
 
-def update(queryset, model_objs, update_fields=None):
+def update(
+    queryset: Union[models.Model, models.QuerySet],
+    model_objs: List[models.Model],
+    update_fields: Union[List[str], None] = None,
+) -> None:
     """
-    Bulk updates a list of model objects that are already saved.
+    Performs a bulk update.
 
     Args:
-        queryset (QuerySet): The queryset to use when bulk updating
-        model_objs (List[Model]): Model object values to use for the update
-        update_fields (List[str], default=None): A list of fields on the
-            model objects to update. If ``None``, all fields will be updated.
+        queryset: The queryset to use when bulk updating
+        model_objs: Model object values to use for the update
+        update_fields: A list of fields on the
+            model objects to update. If `None`, all fields will be updated.
 
     Example:
         Update an attribute of multiple models in bulk::
@@ -561,72 +510,83 @@ def update(queryset, model_objs, update_fields=None):
         return cursor.execute(update_sql, update_sql_params)
 
 
-def upsert(
-    queryset,
-    model_objs,
-    unique_fields,
-    update_fields=None,
-    returning=False,
-    ignore_duplicate_updates=True,
-    return_untouched=False,
-):
+async def aupdate(
+    queryset: Union[models.Model, models.QuerySet],
+    model_objs: List[models.Model],
+    update_fields: Union[List[str], None] = None,
+) -> None:
     """
-    Perform a bulk upsert on a table.
+    Perform an asynchronous bulk update.
+
+    See [pgbulk.update][]
+    """
+    return await sync_to_async(update)(queryset, model_objs, update_fields)
+
+
+def upsert(
+    queryset: Union[models.Model, models.QuerySet],
+    model_objs: List[models.Model],
+    unique_fields: List[str],
+    update_fields: Union[List[str], None] = None,
+    *,
+    returning: Union[List[str], bool] = False,
+    redundant_updates: bool = False,
+) -> UpsertResult:
+    """
+    Perform a bulk upsert.
 
     Args:
-        queryset (Model|QuerySet): A model or a queryset that defines the
+        queryset: A model or a queryset that defines the
             collection to upsert
-        model_objs (List[Model]): A list of Django models to upsert. All models
+        model_objs: A list of Django models to upsert. All models
             in this list will be bulk upserted.
-        unique_fields (List[str]): A list of fields that define the uniqueness
+        unique_fields: A list of fields that define the uniqueness
             of the model. The model must have a unique constraint on these
             fields
-        update_fields (List[str], default=None): A list of fields to update
-            whenever objects already exist. If an empty list is provided, it
-            is equivalent to doing a bulk insert on the objects that don't
-            exist. If `None`, all fields will be updated. If you want to
-            perform an expression such as an ``F`` object on a field when
-            it is updated, use the ``pgbulk.UpdateField`` class. See
-            examples below.
-        returning (bool|List[str], default=False): If True, returns all fields.
-            If a list, only returns fields in the list. If False, do not
-            return results from the upsert.
-        ignore_duplicate_updates (bool, default=True): Don't perform an update
-            if all columns are identical to the row in the database.
-        return_untouched (bool, default=False): When
-            ``ignore_duplicate_updates`` is ``True``, untouched rows will not
-            be returned in upsert results. Set this to ``True`` to return
-            untouched rows.
+        update_fields: A list of fields to update whenever objects already exist.
+            If an empty list is provided, it is equivalent to doing a bulk insert on
+            the objects that don't exist. If `None`, all fields will be updated.
+            If you want to perform an expression such as an `F` object on a field when
+            it is updated, use the [pgbulk.UpdateField][] class. See examples below.
+        returning: If True, returns all fields. If a list, only returns fields
+            in the list. If False, do not return results from the upsert.
+        redundant_updates: Perform an update
+            even if all columns are identical to the row in the database.
 
-    Examples:
-        A basic bulk upsert on a model::
+    Returns:
+        The upsert result, an iterable list of all upsert objects. Use the `.updated`
+            and `.created` attributes to iterate over created or updated elements.
+
+    Example:
+        A basic bulk upsert on a model:
 
             import pgbulk
 
             pgbulk.upsert(
                 MyModel,
                 [
-                    MyModel(int_field=1, some_attr='some_val1'),
-                    MyModel(int_field=2, some_attr='some_val2')
+                    MyModel(int_field=1, some_attr="some_val1"),
+                    MyModel(int_field=2, some_attr="some_val2"),
                 ],
                 # These are the fields that identify the uniqueness constraint.
-                ['int_field'],
+                ["int_field"],
                 # These are the fields that will be updated if the row already
                 # exists. If not provided, all fields will be updated
-                ['some_attr']
+                ["some_attr"]
             )
 
-        Return the results of an upsert::
+    Example:
+        Return the results of an upsert:
 
             results = pgbulk.upsert(
                 MyModel,
                 [
-                    MyModel(int_field=1, some_attr='some_val1'),
-                    MyModel(int_field=2, some_attr='some_val2')
+                    MyModel(int_field=1, some_attr="some_val1"),
+                    MyModel(int_field=2, some_attr="some_val2"),
                 ],
-                ['int_field'],
-                ['some_attr'],
-                # ``True`` will return all columns. One can also explicitly
+                ["int_field"],
+                ["some_attr"],
+                # `True` will return all columns. One can also explicitly
                 # list which columns will be returned
                 returning=True
             )
@@ -639,64 +599,44 @@ def upsert(
             # be updated and will not be returned.
             print(results.updated)
 
+    Example:
         Upsert values and update rows even when the update is meaningless
-        (i.e. a duplicate update). This is turned off by default, but it
+        (i.e. a redundant update). This is turned off by default, but it
         can be enabled in case postgres triggers or other processes
-        need to happen as a result of an update::
+        need to happen as a result of an update:
 
             pgbulk.upsert(
                 MyModel,
                 [
-                    MyModel(int_field=1, some_attr='some_val1'),
-                    MyModel(int_field=2, some_attr='some_val2')
+                    MyModel(int_field=1, some_attr="some_val1"),
+                    MyModel(int_field=2, some_attr="some_val2"),
                 ],
-                ['int_field'],
-                ['some_attr'],
-                # Perform updates in the database even if it's a duplicate
-                # update.
-                ignore_duplicate_updates=False
+                ["int_field"],
+                ["some_attr"],
+                # Perform updates in the database even if it's identical
+                redundant_updates=True
             )
 
-        Upsert values and ignore duplicate updates, but still return
-        the rows that were untouched by the upsert::
-
-            results = pgbulk.upsert(
-                MyModel,
-                [
-                    MyModel(int_field=1, some_attr='some_val1'),
-                    MyModel(int_field=2, some_attr='some_val2')
-                ],
-                ['int_field'],
-                ['some_attr'],
-                returning=True,
-                # Even though we don't perform an update on a duplicate,
-                # return the row that was part of the upsert but untouched
-                # This option is only meaningful when
-                # ignore_duplicate_updates=True (the default)
-                return_untouched=True,
-            )
-
-            # Print untouched rows
-            print(results.untouched)
-
+    Example:
         Use an expression for a field if an update happens. In the example
-        below, we increment ``some_int_field`` by one whenever an update happens.
-        Otherwise it defaults to zero::
+        below, we increment `some_int_field` by one whenever an update happens.
+        Otherwise it defaults to zero:
 
             results = pgbulk.upsert(
                 MyModel,
                 [
-                    MyModel(some_int_field=0, some_key='a'),
-                    MyModel(some_int_field=0, some_key='b')
+                    MyModel(some_int_field=0, some_key="a"),
+                    MyModel(some_int_field=0, some_key="b")
                 ],
-                ['some_key'],
+                ["some_key"],
                 [
-                    # Use the UpdateField class to specify an expression for the update.
-                    # If provided, the expression will be executed when an update happens.
-                    pgbulk.UpdateField('some_int_field', expression=models.F('some_int_field') + 1)
+                    # Use UpdateField to specify an expression for the update.
+                    pgbulk.UpdateField(
+                        "some_int_field",
+                        expression=models.F("some_int_field") + 1
+                    )
                 ],
             )
-
     """
     return _upsert(
         queryset,
@@ -704,73 +644,29 @@ def upsert(
         unique_fields,
         update_fields=update_fields,
         returning=returning,
-        ignore_duplicate_updates=ignore_duplicate_updates,
-        return_untouched=return_untouched,
-        sync=False,
+        redundant_updates=redundant_updates,
     )
 
 
-def sync(
-    queryset,
-    model_objs,
-    unique_fields,
-    update_fields=None,
-    returning=False,
-    ignore_duplicate_updates=True,
-    return_untouched=False,
-):
+async def aupsert(
+    queryset: Union[models.Model, models.QuerySet],
+    model_objs: List[models.Model],
+    unique_fields: List[str],
+    update_fields: Union[List[str], None] = None,
+    *,
+    returning: Union[List[str], bool] = False,
+    redundant_updates: bool = False,
+) -> UpsertResult:
     """
-    Perform a bulk sync on a table. A sync is an upsert on a list of model
-    objects followed by a delete on the queryset whose elements were not
-    in the list of models.
+    Perform an asynchronous bulk upsert.
 
-    Args:
-        queryset (Model|QuerySet): A model or a queryset that defines the
-            collection to sync. If a model is provided, all rows are
-            candidates for the sync operation
-        model_objs (List[Model]): A list of Django models to sync. All models
-            in this list will be bulk upserted. Any models in the queryset
-            that are not present in this list will be deleted.
-        unique_fields (List[str]): A list of fields that define the uniqueness
-            of the model. The model must have a unique constraint on these
-            fields
-        update_fields (List[str], default=None): A list of fields to update
-            whenever objects already exist. If an empty list is provided, it
-            is equivalent to doing a bulk insert on the objects that don't
-            exist. If `None`, all fields will be updated.
-        returning (bool|List[str]): If True, returns all fields. If a list,
-            only returns fields in the list
-        ignore_duplicate_updates (bool, default=True): Don't perform an update
-            if the row is a duplicate.
-
-    Examples:
-        Sync two elements to a table with three elements. The sync will
-        upsert two elements and delete the third::
-
-            # Assume the MyModel table has objects with int_field=1,2,3
-            # We will sync this table to two elements
-            results = pgbulk.sync(
-                MyModel.objects.all(),
-                [
-                    MyModel(int_field=1, some_attr='some_val1'),
-                    MyModel(int_field=2, some_attr='some_val2')
-                ],
-                ['int_field'],
-                ['some_attr'],
-            )
-
-            # Print created, updated, untouched, and deleted rows from the sync
-            print(results.created)
-            print(results.updated)
-            print(results.untouched)
-            print(results.deleted)
+    See [pgbulk.upsert][]
     """
-    return _upsert(
+    return await sync_to_async(upsert)(
         queryset,
         model_objs,
         unique_fields,
-        update_fields=update_fields,
+        update_fields,
         returning=returning,
-        ignore_duplicate_updates=ignore_duplicate_updates,
-        sync=True,
+        redundant_updates=redundant_updates,
     )

@@ -1,9 +1,10 @@
 import datetime as dt
 
 import ddf
-from django.db.models import F
 import freezegun
 import pytest
+from asgiref.sync import async_to_sync
+from django.db.models import F
 from pytz import timezone
 
 import pgbulk
@@ -28,28 +29,24 @@ def test_func_field_upsert():
         [models.TestFuncFieldModel(my_key="a", int_val=0)],
         ["my_key"],
         [pgbulk.UpdateField("int_val", expression=F("int_val") - 3)],
-        ignore_duplicate_updates=True,
+        redundant_updates=False,
         returning=True,
-        return_untouched=True,
     )
     assert models.TestFuncFieldModel.objects.count() == 1
     assert models.TestFuncFieldModel.objects.get().int_val == -2
-    assert len(list(ret.updated)) == 1
-    assert len(list(ret.untouched)) == 0
+    assert len(ret.updated) == 1
 
     ret = pgbulk.upsert(
         models.TestFuncFieldModel,
         [models.TestFuncFieldModel(my_key="a", int_val=-2)],
         ["my_key"],
         [pgbulk.UpdateField("int_val")],
-        ignore_duplicate_updates=True,
-        return_untouched=True,
+        redundant_updates=False,
         returning=True,
     )
     assert models.TestFuncFieldModel.objects.count() == 1
     assert models.TestFuncFieldModel.objects.get().int_val == -2
-    assert len(list(ret.updated)) == 0
-    assert len(list(ret.untouched)) == 1
+    assert len(ret.updated) == 0
 
     ret = pgbulk.upsert(
         models.TestFuncFieldModel,
@@ -58,7 +55,7 @@ def test_func_field_upsert():
         [pgbulk.UpdateField("int_val", expression=F("int_val") - 3)],
         returning=True,
     )
-    assert len(list(ret.created)) == 1
+    assert len(ret.created) == 1
 
     ret = pgbulk.upsert(
         models.TestFuncFieldModel,
@@ -106,240 +103,6 @@ def test_auto_field_upsert():
 
 
 @pytest.mark.django_db
-def test_sync_w_char_pk():
-    """
-    Tests with a model that has a char pk.
-    """
-    extant_obj1 = ddf.G(models.TestPkChar, my_key="1", char_field="1")
-    extant_obj2 = ddf.G(models.TestPkChar, my_key="2", char_field="1")
-    extant_obj3 = ddf.G(models.TestPkChar, my_key="3", char_field="1")
-
-    pgbulk.sync(
-        models.TestPkChar,
-        [
-            models.TestPkChar(my_key="3", char_field="2"),
-            models.TestPkChar(my_key="4", char_field="2"),
-            models.TestPkChar(my_key="5", char_field="2"),
-        ],
-        ["my_key"],
-        ["char_field"],
-    )
-
-    assert models.TestPkChar.objects.count() == 3
-    assert models.TestPkChar.objects.filter(my_key="3").exists()
-    assert models.TestPkChar.objects.filter(my_key="4").exists()
-    assert models.TestPkChar.objects.filter(my_key="5").exists()
-
-    with pytest.raises(models.TestPkChar.DoesNotExist):
-        models.TestPkChar.objects.get(pk=extant_obj1.pk)
-    with pytest.raises(models.TestPkChar.DoesNotExist):
-        models.TestPkChar.objects.get(pk=extant_obj2.pk)
-    test_model = models.TestPkChar.objects.get(pk=extant_obj3.pk)
-    assert test_model.char_field == "2"
-
-
-@pytest.mark.django_db
-def test_sync_no_existing_objs():
-    """
-    Tests when there are no existing objects before the sync.
-    """
-    pgbulk.sync(
-        models.TestModel,
-        [
-            models.TestModel(int_field=1),
-            models.TestModel(int_field=3),
-            models.TestModel(int_field=4),
-        ],
-        ["int_field"],
-        ["float_field"],
-    )
-    assert models.TestModel.objects.count() == 3
-    assert models.TestModel.objects.filter(int_field=1).exists()
-    assert models.TestModel.objects.filter(int_field=3).exists()
-    assert models.TestModel.objects.filter(int_field=4).exists()
-
-
-@pytest.mark.django_db
-def test_sync_existing_objs_all_deleted():
-    """
-    Tests when there are existing objects that will all be deleted.
-    """
-    extant_obj1 = ddf.G(models.TestModel, int_field=1)
-    extant_obj2 = ddf.G(models.TestModel, int_field=2)
-    extant_obj3 = ddf.G(models.TestModel, int_field=3)
-
-    pgbulk.sync(
-        models.TestModel,
-        [
-            models.TestModel(int_field=4),
-            models.TestModel(int_field=5),
-            models.TestModel(int_field=6),
-        ],
-        ["int_field"],
-        ["float_field"],
-    )
-
-    assert models.TestModel.objects.count() == 3
-    assert models.TestModel.objects.filter(int_field=4).exists()
-    assert models.TestModel.objects.filter(int_field=5).exists()
-    assert models.TestModel.objects.filter(int_field=6).exists()
-
-    with pytest.raises(models.TestModel.DoesNotExist):
-        models.TestModel.objects.get(id=extant_obj1.id)
-    with pytest.raises(models.TestModel.DoesNotExist):
-        models.TestModel.objects.get(id=extant_obj2.id)
-    with pytest.raises(models.TestModel.DoesNotExist):
-        models.TestModel.objects.get(id=extant_obj3.id)
-
-
-@pytest.mark.django_db
-def test_sync_existing_objs_all_deleted_empty_sync():
-    """
-    Tests when there are existing objects deleted because of an emtpy sync.
-    """
-    extant_obj1 = ddf.G(models.TestModel, int_field=1)
-    extant_obj2 = ddf.G(models.TestModel, int_field=2)
-    extant_obj3 = ddf.G(models.TestModel, int_field=3)
-
-    pgbulk.sync(models.TestModel, [], ["int_field"], ["float_field"])
-
-    assert not models.TestModel.objects.exists()
-    with pytest.raises(models.TestModel.DoesNotExist):
-        models.TestModel.objects.get(id=extant_obj1.id)
-    with pytest.raises(models.TestModel.DoesNotExist):
-        models.TestModel.objects.get(id=extant_obj2.id)
-    with pytest.raises(models.TestModel.DoesNotExist):
-        models.TestModel.objects.get(id=extant_obj3.id)
-
-
-@pytest.mark.django_db
-def test_sync_existing_objs_some_deleted():
-    """
-    Tests when some existing objects will be deleted.
-    """
-    extant_obj1 = ddf.G(models.TestModel, int_field=1, float_field=1)
-    extant_obj2 = ddf.G(models.TestModel, int_field=2, float_field=1)
-    extant_obj3 = ddf.G(models.TestModel, int_field=3, float_field=1)
-
-    pgbulk.sync(
-        models.TestModel,
-        [
-            models.TestModel(int_field=3, float_field=2),
-            models.TestModel(int_field=4, float_field=2),
-            models.TestModel(int_field=5, float_field=2),
-        ],
-        ["int_field"],
-        [pgbulk.UpdateField("float_field")],
-    )
-
-    assert models.TestModel.objects.count() == 3
-    assert models.TestModel.objects.filter(int_field=3).exists()
-    assert models.TestModel.objects.filter(int_field=4).exists()
-    assert models.TestModel.objects.filter(int_field=5).exists()
-
-    with pytest.raises(models.TestModel.DoesNotExist):
-        models.TestModel.objects.get(id=extant_obj1.id)
-    with pytest.raises(models.TestModel.DoesNotExist):
-        models.TestModel.objects.get(id=extant_obj2.id)
-    test_model = models.TestModel.objects.get(id=extant_obj3.id)
-    assert test_model.int_field == 3
-
-
-@pytest.mark.django_db
-def test_sync_existing_objs_some_deleted_w_queryset():
-    """
-    Tests when some existing objects will be deleted on a queryset
-    """
-    extant_obj0 = ddf.G(models.TestModel, int_field=0, float_field=1)
-    extant_obj1 = ddf.G(models.TestModel, int_field=1, float_field=1)
-    extant_obj2 = ddf.G(models.TestModel, int_field=2, float_field=1)
-    extant_obj3 = ddf.G(models.TestModel, int_field=3, float_field=1)
-    extant_obj4 = ddf.G(models.TestModel, int_field=4, float_field=0)
-
-    pgbulk.sync(
-        models.TestModel.objects.filter(int_field__lt=4),
-        [
-            models.TestModel(int_field=1, float_field=2),
-            models.TestModel(int_field=2, float_field=2),
-            models.TestModel(int_field=3, float_field=2),
-        ],
-        ["int_field"],
-        ["float_field"],
-    )
-
-    assert models.TestModel.objects.count() == 4
-    assert models.TestModel.objects.filter(int_field=1).exists()
-    assert models.TestModel.objects.filter(int_field=2).exists()
-    assert models.TestModel.objects.filter(int_field=3).exists()
-
-    with pytest.raises(models.TestModel.DoesNotExist):
-        models.TestModel.objects.get(id=extant_obj0.id)
-
-    test_model = models.TestModel.objects.get(id=extant_obj1.id)
-    assert test_model.float_field == 2
-    test_model = models.TestModel.objects.get(id=extant_obj2.id)
-    assert test_model.float_field == 2
-    test_model = models.TestModel.objects.get(id=extant_obj3.id)
-    assert test_model.float_field == 2
-    test_model = models.TestModel.objects.get(id=extant_obj4.id)
-    assert test_model.float_field == 0
-
-
-@pytest.mark.django_db
-def test_sync_existing_objs_some_deleted_wo_update():
-    """
-    Tests when some existing objects will be deleted on a queryset. Run syncing
-    with no update fields and verify they are untouched in the sync
-    """
-    objs = [ddf.G(models.TestModel, int_field=i, float_field=i) for i in range(5)]
-
-    results = pgbulk.sync(
-        models.TestModel.objects.filter(int_field__lt=4),
-        [
-            models.TestModel(int_field=1, float_field=2),
-            models.TestModel(int_field=2, float_field=2),
-            models.TestModel(int_field=3, float_field=2),
-        ],
-        ["int_field"],
-        [],
-        returning=True,
-    )
-
-    assert len(list(results)) == 4
-    assert len(list(results.deleted)) == 1
-    assert len(list(results.untouched)) == 3
-    assert list(results.deleted)[0].id == objs[0].id
-
-
-@pytest.mark.django_db
-def test_sync_existing_objs_some_deleted_some_updated():
-    """
-    Tests when some existing objects will be deleted on a queryset. Run syncing
-    with some update fields.
-    """
-    objs = [ddf.G(models.TestModel, int_field=i, float_field=i) for i in range(5)]
-
-    results = pgbulk.sync(
-        models.TestModel.objects.filter(int_field__lt=4),
-        [
-            models.TestModel(int_field=1, float_field=2),
-            models.TestModel(int_field=2, float_field=2),
-            models.TestModel(int_field=3, float_field=2),
-        ],
-        ["int_field"],
-        ["float_field"],
-        returning=True,
-        ignore_duplicate_updates=True,
-    )
-
-    assert len(list(results)) == 4
-    assert len(list(results.deleted)) == 1
-    assert len(list(results.updated)) == 2
-    assert len(list(results.untouched)) == 1
-    assert list(results.deleted)[0].id == objs[0].id
-
-
-@pytest.mark.django_db
 def test_upsert_return_upserts_none():
     """
     Tests the return_upserts flag on bulk upserts when there is no data.
@@ -384,7 +147,7 @@ def test_upsert_return_created_values():
         returning=True,
     )
 
-    assert len(list(results.created)) == 3
+    assert len(results.created) == 3
     for test_model, expected_int in zip(
         sorted(results.created, key=lambda k: k.int_field), [1, 3, 4]
     ):
@@ -411,9 +174,9 @@ def test_upsert_return_list_of_values():
         returning=["float_field"],
     )
 
-    assert len(list(results.created)) == 3
+    assert len(results.created) == 3
     with pytest.raises(AttributeError):
-        list(results.created)[0].int_field
+        results.created[0].int_field  # noqa
     assert {2, 4, 5} == {m.float_field for m in results.created}
 
 
@@ -437,8 +200,8 @@ def test_upsert_return_created_updated_values():
         returning=True,
     )
 
-    created = list(results.created)
-    updated = list(results.updated)
+    created = results.created
+    updated = results.updated
     assert len(created) == 3
     assert len(updated) == 1
     for test_model, expected_int in zip(sorted(created, key=lambda k: k.int_field), [1, 3, 4]):
@@ -475,8 +238,8 @@ def test_upsert_created_updated_auto_datetime_values():
             returning=True,
         )
 
-    assert len(list(results.created)) == 3
-    assert len(list(results.updated)) == 1
+    assert len(results.created) == 3
+    assert len(results.updated) == 1
 
     expected_auto_now = [
         dt.datetime(2018, 9, 2),
@@ -582,7 +345,7 @@ def test_upsert_update_fields_returning():
         returning=True,
     )
 
-    assert list(results.created) == []
+    assert results.created == []
     assert {u.id for u in results.updated} == {t.id for t in test_models}
     assert {u.int_field for u in results.updated} == {0, 1, 2}
     assert {u.float_field for u in results.updated} == {0, 1, 2}
@@ -639,7 +402,7 @@ def test_upsert_update_duplicate_fields_returning_none_updated():
         ["int_field"],
         ["char_field", "float_field"],
         returning=True,
-        ignore_duplicate_updates=True,
+        redundant_updates=False,
     )
 
     assert list(results) == []
@@ -664,51 +427,18 @@ def test_upsert_update_duplicate_fields_returning_some_updated():
             models.TestModel(int_field=0, char_field="-1", float_field=-1),
             models.TestModel(int_field=1, char_field="-1", float_field=-1),
             models.TestModel(int_field=2, char_field="0", float_field=-1),
-        ],
-        ["int_field"],
-        ["char_field", "float_field"],
-        returning=["char_field"],
-        ignore_duplicate_updates=True,
-    )
-
-    assert list(results.created) == []
-    assert len(list(results.updated)) == 1
-    assert list(results.updated)[0].char_field == "0"
-
-
-@pytest.mark.django_db
-def test_upsert_update_duplicate_fields_returning_some_updated_untouched():
-    """
-    Tests the case when all updates were previously stored and the upsert
-    tries to update the rows with duplicate values. Test when some aren't
-    duplicates
-    """
-    # Create previously stored test models with a unique int field and -1 for
-    # all other fields
-    for i in range(3):
-        ddf.G(models.TestModel, int_field=i, char_field="-1", float_field=-1)
-
-    # Update using the int field as a uniqueness constraint
-    results = pgbulk.upsert(
-        models.TestModel,
-        [
-            models.TestModel(int_field=0, char_field="-1", float_field=-1),
-            models.TestModel(int_field=1, char_field="-1", float_field=-1),
-            models.TestModel(int_field=2, char_field="0", float_field=-1),
             models.TestModel(int_field=3, char_field="3", float_field=3),
         ],
         ["int_field"],
         ["char_field", "float_field"],
         returning=["char_field"],
-        ignore_duplicate_updates=True,
-        return_untouched=True,
+        redundant_updates=False,
     )
 
-    assert len(list(results.updated)) == 1
-    assert len(list(results.untouched)) == 2
-    assert len(list(results.created)) == 1
-    assert list(results.updated)[0].char_field == "0"
-    assert list(results.created)[0].char_field == "3"
+    assert len(results.updated) == 1
+    assert len(results.created) == 1
+    assert results.updated[0].char_field == "0"
+    assert results.created[0].char_field == "3"
 
 
 @pytest.mark.django_db
@@ -716,8 +446,7 @@ def test_upsert_update_duplicate_fields_returning_some_updated_ignore_dups():
     """
     Tests the case when all updates were previously stored and the upsert
     tries to update the rows with duplicate values. Test when some aren't
-    duplicates and return untouched results. There will be no untouched
-    results in this test since we turn off ignoring duplicate updates
+    duplicates.
     """
     # Create previously stored test models with a unique int field and -1 for
     # all other fields
@@ -736,14 +465,12 @@ def test_upsert_update_duplicate_fields_returning_some_updated_ignore_dups():
         ["int_field"],
         ["char_field", "float_field"],
         returning=["char_field"],
-        ignore_duplicate_updates=False,
-        return_untouched=True,
+        redundant_updates=True,
     )
 
-    assert len(list(results.untouched)) == 0
-    assert len(list(results.updated)) == 3
-    assert len(list(results.created)) == 1
-    assert list(results.created)[0].char_field == "3"
+    assert len(results.updated) == 3
+    assert len(results.created) == 1
+    assert results.created[0].char_field == "3"
 
 
 @pytest.mark.django_db
@@ -1285,3 +1012,44 @@ def test_update_objects_with_custom_db_field_types():
     # Assert that the array field was updated
     assert test_obj_1.array_field, ["one", "two" == "updated"]
     assert test_obj_2.array_field, ["three", "four" == "updated"]
+
+
+@pytest.mark.django_db
+def test_aupsert():
+    """
+    Basic test for async upsert
+    """
+
+    async def _run_aupsert():
+        return await pgbulk.aupsert(
+            models.TestModel,
+            [
+                models.TestModel(int_field=0, char_field="0", float_field=0),
+                models.TestModel(int_field=1, char_field="1", float_field=1),
+                models.TestModel(int_field=2, char_field="2", float_field=2),
+            ],
+            ["int_field"],
+            ["char_field", "float_field"],
+            returning=True,
+        )
+
+    results = async_to_sync(_run_aupsert)()
+
+    assert models.TestModel.objects.count() == 3
+    assert len(results) == 3
+    assert len(results.created) == 3
+
+
+@pytest.mark.django_db
+def test_aupdate():
+    """
+    Basic test for async update
+    """
+
+    async def _run_aupdate(t_model):
+        await pgbulk.aupdate(models.TestModel, [t_model], ["int_field"])
+
+    t_model = models.TestModel.objects.create()
+    t_model.int_field = 1000
+    async_to_sync(_run_aupdate)(t_model)
+    assert models.TestModel.objects.get().int_field == 1000

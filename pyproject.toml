@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 99
-target-version = ['py37']
+target-version = ['py38']
 
 [tool.coverage.run]
 branch = true
@@ -41,11 +41,11 @@ classifiers = [
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.7",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3 :: Only",
   "Framework :: Django",
 ]
@@ -56,9 +56,8 @@ repository = "https://github.com/Opus10/django-pgbulk"
 documentation = "https://django-pgbulk.readthedocs.io"
 
 [tool.poetry.dependencies]
-python = ">=3.7.0,<4"
-django = ">=2"
-importlib_metadata = { version = ">=4", python = "~3.7" }
+python = ">=3.8.0,<4"
+django = ">=3"
 
 [tool.poetry.dev-dependencies]
 black = "22.6.0"
@@ -81,6 +80,7 @@ pytest-cov = "3.0.0"
 pytest-dotenv = "0.5.2"
 pytest-django = "4.5.2"
 requests = "2.25.1"
+ruff = "0.0.292"
 Sphinx = "4.4.0"
 sphinx-rtd-theme = "1.0.0"
 footing = "*"

@@ -18,27 +18,19 @@ If you prefer a native development environment, `make conda-setup` will set up a
 
 Run the tests on one Python version with:
 
-```
-make test
-```
+    make test
 
 Run the full test suite against all supported Python versions with:
 
-```
-make full-test-suite
-```
+    make full-test-suite
 
 Validate the code with:
 
-```
-make lint
-```
+    make lint
 
-If your code fails the `black` check, automatically format your code with:
+If your code fails the linter checks, fix common errors with:
 
-```
-make format
-```
+    make lint-fix
 
 ## Committing
 
@@ -46,21 +38,15 @@ This project uses [git-tidy](<https://github.com/Opus10/git-tidy) to produce str
 
 To do a structured commit with `git-tidy`, do:
 
-```
-make tidy-commit
-```
+    make tidy-commit
 
 All commits in a pull request must be tidy commits that encapsulate a change. Ideally entire features or bug fixes are encapsulated in a single commit. Squash all of your commits into a tidy commit with:
 
-```
-make tidy-squash
-```
+    make tidy-squash
 
 To check if your commits pass linting, do:
 
-```
-make tidy-lint
-```
+    make tidy-lint
 
 Note, the above command lints every commit since branching from master. You can also run `make shell` and run `git tidy` commands inside the docker environment to do other flavors of `git tidy` commands.
 
@@ -68,15 +54,11 @@ Note, the above command lints every commit since branching from master. You can 
 
 [Mkdocs Material](https://squidfunk.github.io/mkdocs-material/) documentation can be built with:
 
-```
-make docs
-```
+    make docs
 
 A shortcut for serving them is:
 
-```
-make serve-docs
-```
+    make docs-serve
 
 ## Releases and Versioning
 

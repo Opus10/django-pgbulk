@@ -7,4 +7,4 @@
 
 ## Compatibility
 
-``django-pgbulk`` is compatible with Python 3.7 -- 3.11, Django 3.2 -- 4.2, Psycopg 2 -- 3 and Postgres 12 -- 15.
+`django-pgbulk` is compatible with Python 3.8 - 3.12, Django 3.2 - 4.2, Psycopg 2 - 3 and Postgres 12 - 16, and async Python.

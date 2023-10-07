@@ -1,6 +1,6 @@
 # Installation
 
-Install `django-pgbulk` with::
+Install `django-pgbulk` with:
 
     pip3 install django-pgbulk
 

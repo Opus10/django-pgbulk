@@ -6,11 +6,9 @@ This project was created using footing. For more information about footing, go t
 
 Set up your development environment with:
 
-```
-git clone git@github.com:Opus10/django-pgbulk.git
-cd pgbulk
-make docker-setup
-```
+    git clone git@github.com:Opus10/django-pgbulk.git
+    cd pgbulk
+    make docker-setup
 
 `make docker-setup` will set up a development environment managed by Docker. Install docker [here](https://www.docker.com/get-started>) and be sure it is running when executing any of the commands below.
 

@@ -4,8 +4,8 @@
 #
 # setup - Sets up the development environment
 # dependencies - Installs dependencies
-# docs - Build docs
-# docs-serve - Serve live documentation
+# docs - Build documentation
+# docs-serve - Serve documentation
 # lint - Run code linting and static checks
 # lint-fix - Fix common linting errors
 # test - Run tests using pytest
@@ -50,9 +50,9 @@ ifndef run
 	      "    test: Run tests\n"\
 	      "    tox: Run tests against all versions of Python\n"\
 	      "    lint: Run code linting and static checks\n"\
-	      "    format: Format code using Black\n"\
-	      "    docs: Serve documentation\n"\
-	      "    open-docs: Open built documentation\n"\
+	      "    lint-fix: Fix common linting errors\n"\
+	      "    docs: Build documentation\n"\
+	      "    docs-serve: Serve documentation\n"\
 	      "    docker-teardown: Spin down docker resources\n"\
 	      "\n"\
 	      "View the Makefile for more documentation"

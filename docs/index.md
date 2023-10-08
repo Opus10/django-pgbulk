@@ -9,6 +9,44 @@
 
     Use [pgbulk.aupdate][] and [pgbulk.aupsert][] for async-compatible versions.
 
+## Quick Start
+
+Do a bulk upsert on a model:
+
+    import pgbulk
+
+    pgbulk.upsert(
+        MyModel,
+        [
+            MyModel(int_field=1, some_attr="some_val1"),
+            MyModel(int_field=2, some_attr="some_val2"),
+        ],
+        # These are the fields that identify the uniqueness constraint.
+        ["int_field"],
+        # These are the fields that will be updated if the row already
+        # exists. If not provided, all fields will be updated
+        ["some_attr"]
+    )
+
+Do a bulk update on a model:
+
+    import pgbulk
+
+    pgbulk.update(
+        MyModel,
+        [
+            MyModel(id=1, some_attr='some_val1'),
+            MyModel(id=2, some_attr='some_val2')
+        ],
+        # These are the fields that will be updated. If not provided,
+        # all fields will be updated
+        ['some_attr']
+    )
+
 ## Compatibility
 
 `django-pgbulk` is compatible with Python 3.8 - 3.12, Django 3.2 - 4.2, Psycopg 2 - 3, and Postgres 12 - 16.
+
+## Next Steps
+
+View the [user guide section](guide.md), which has more examples and advanced usage.

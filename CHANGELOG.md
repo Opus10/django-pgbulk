@@ -1,17 +1,25 @@
 # Changelog
 
-## 2.0.0 (2023-10-07)
+## 2.0.1 (2023-10-07)
+
+### Trivial
+
+  - Fix release notes [Wesley Kendall, 8a88b7a]
+
+## 2.0.0 (2023-10-08)
 
 ### Api-Break
 
-  - Python 3.12 / async support, dropping of `pgbulk.sync` and `return_untouched` [Wesley Kendall, 9b0f94b]
+  - Python 3.12 / async support, dropping of `pgbulk.sync` and `return_untouched` [Wesley Kendall, de70607]
 
     This version of `django-pgbulk` breaks the API in the following manner:
+
     - `pgbulk.upsert` no longer supports the `return_untouched` argument. It had race conditions and will only be brought back if those race conditions can be addressed.
     - `pgbulk.upsert`'s `ignore_duplicate_updates` was renamed to `redundant_updates`. The default functionality is still the same, but the argument now has the opposite meaning.
     - `pgbulk.sync` was dropped since it relied on the `return_untouched` argument.
 
     This release also includes the following changes:
+
     - Python 3.12 is supported and Python 3.7 is dropped
     - Postgres 16 support
     - Async-compatible `pgbulk.aupsert` and `pgbulk.aupdate` were added

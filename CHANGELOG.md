@@ -1,6 +1,12 @@
 # Changelog
 
-## 2.0.1 (2023-10-07)
+## 2.0.2 (2023-10-08)
+
+### Trivial
+
+  - Add additional docs and notes around async usaged and model signals. [Wesley Kendall, 4cce843]
+
+## 2.0.1 (2023-10-08)
 
 ### Trivial
 

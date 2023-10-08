@@ -419,6 +419,9 @@ def update(
         update_fields: A list of fields on the
             model objects to update. If `None`, all fields will be updated.
 
+    Note:
+        Model signals such as `post_save` are not emitted.
+
     Example:
         Update an attribute of multiple models in bulk::
 
@@ -519,6 +522,11 @@ async def aupdate(
     Perform an asynchronous bulk update.
 
     See [pgbulk.update][]
+
+    Note:
+        Like other async Django ORM methods, `aupdate` currently wraps `update` in
+        a `sync_to_async` wrapper. It does not yet use an asynchronous database
+        driver but will in the future.
     """
     return await sync_to_async(update)(queryset, model_objs, update_fields)
 
@@ -556,6 +564,9 @@ def upsert(
     Returns:
         The upsert result, an iterable list of all upsert objects. Use the `.updated`
             and `.created` attributes to iterate over created or updated elements.
+
+    Note:
+        Model signals such as `post_save` are not emitted.
 
     Example:
         A basic bulk upsert on a model:
@@ -661,6 +672,11 @@ async def aupsert(
     Perform an asynchronous bulk upsert.
 
     See [pgbulk.upsert][]
+
+    Note:
+        Like other async Django ORM methods, `aupsert` currently wraps `upsert` in
+        a `sync_to_async` wrapper. It does not yet use an asynchronous database
+        driver but will in the future.
     """
     return await sync_to_async(upsert)(
         queryset,

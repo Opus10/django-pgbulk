@@ -1,7 +1,7 @@
 _extensions:
 - jinja2_time.TimeExtension
 _template: git@github.com:Opus10/public-django-app-template.git
-_version: e657b058113b0c30f955c3f65cd09b779eab6c3a
+_version: 61fb54bab32508ca0cc5d70a9155f49d124f04c0
 module_name: pgbulk
 repo_name: django-pgbulk
 short_description: Native postgres bulk update and upsert operations.

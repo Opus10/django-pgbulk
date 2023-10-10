@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.4 (2023-10-10)
+
+### Trivial
+
+  - Improve base type annotations, avoid type annotations in comments [Maxwell Muoto, 862e253]
+
 ## 2.0.3 (2023-10-09)
 
 ### Trivial

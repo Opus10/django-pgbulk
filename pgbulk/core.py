@@ -1,6 +1,6 @@
 import itertools
 from collections import UserString, namedtuple
-from typing import List, Union
+from typing import Iterable, List, Union
 
 from asgiref.sync import sync_to_async
 from django.core.exceptions import ImproperlyConfigured
@@ -8,6 +8,10 @@ from django.db import connections, models
 from django.db.models.sql.compiler import SQLCompiler
 from django.utils import timezone
 from django.utils.version import get_version_tuple
+
+UpdateFieldsTypeDef = Union[
+    List[str], List["UpsertResult"], List[Union["UpsertResult", str]], None
+]
 
 
 def _psycopg_version():
@@ -357,33 +361,33 @@ def _fetch(
 
 
 def _upsert(
-    queryset,
-    model_objs,
-    unique_fields,
-    update_fields=None,
-    returning=False,
-    redundant_updates=False,
+    queryset: Union[models.Model, models.QuerySet],
+    model_objs: Iterable[models.Model],
+    unique_fields: List[str],
+    update_fields: UpdateFieldsTypeDef = None,
+    returning: Union[List[str], bool] = False,
+    redundant_updates: bool = False,
 ):
     """
     Perform a bulk upsert on a table
 
     Args:
-        queryset (Model|QuerySet): A model or a queryset that defines the
+        queryset: A model or a queryset that defines the
             collection to upsert.
-        model_objs (List[Model]): A list of Django models to upsert.
-        unique_fields (List[str]): A list of fields that define the uniqueness
+        model_objs: An iterable of Django models to upsert.
+        unique_fields: A list of fields that define the uniqueness
             of the model. The model must have a unique constraint on these
             fields.
-        update_fields (List[str], default=None): A list of fields to update
+        update_fields: A list of fields to update
             whenever objects already exist. If an empty list is provided, it
             is equivalent to doing a bulk insert on the objects that don't
             exist. If `None`, all fields will be updated. If you want to
             perform an expression such as an `F` object on a field when
             it is updated, use the [pgbulk.UpdateField][] class. See
             examples below.
-        returning (bool|List[str]): If True, returns all fields. If a list,
+        returning: If True, returns all fields. If a list,
             only returns fields in the list.
-        redundant_updates (bool, default=False): Don't perform an update
+        redundant_updates: Don't perform an update
             if all columns are identical to the row in the database.
     """
     queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
@@ -407,8 +411,8 @@ def _upsert(
 
 def update(
     queryset: Union[models.Model, models.QuerySet],
-    model_objs: List[models.Model],
-    update_fields: Union[List[str], None] = None,
+    model_objs: Iterable[models.Model],
+    update_fields: UpdateFieldsTypeDef = None,
 ) -> None:
     """
     Performs a bulk update.
@@ -515,8 +519,8 @@ def update(
 
 async def aupdate(
     queryset: Union[models.Model, models.QuerySet],
-    model_objs: List[models.Model],
-    update_fields: Union[List[str], None] = None,
+    model_objs: Iterable[models.Model],
+    update_fields: UpdateFieldsTypeDef = None,
 ) -> None:
     """
     Perform an asynchronous bulk update.
@@ -533,9 +537,9 @@ async def aupdate(
 
 def upsert(
     queryset: Union[models.Model, models.QuerySet],
-    model_objs: List[models.Model],
+    model_objs: Iterable[models.Model],
     unique_fields: List[str],
-    update_fields: Union[List[str], None] = None,
+    update_fields: UpdateFieldsTypeDef = None,
     *,
     returning: Union[List[str], bool] = False,
     redundant_updates: bool = False,
@@ -546,7 +550,7 @@ def upsert(
     Args:
         queryset: A model or a queryset that defines the
             collection to upsert
-        model_objs: A list of Django models to upsert. All models
+        model_objs: An iterable of Django models to upsert. All models
             in this list will be bulk upserted.
         unique_fields: A list of fields that define the uniqueness
             of the model. The model must have a unique constraint on these
@@ -661,9 +665,9 @@ def upsert(
 
 async def aupsert(
     queryset: Union[models.Model, models.QuerySet],
-    model_objs: List[models.Model],
+    model_objs: Iterable[models.Model],
     unique_fields: List[str],
-    update_fields: Union[List[str], None] = None,
+    update_fields: UpdateFieldsTypeDef = None,
     *,
     returning: Union[List[str], bool] = False,
     redundant_updates: bool = False,

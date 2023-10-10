@@ -12,24 +12,20 @@ source = ["pgbulk"]
 
 [tool.coverage.report]
 exclude_lines = [
-    "pragma: no cover",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "pass",
-    "pytest.mark.skip"
+  "pragma: no cover",
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "pass",
+  "pytest.mark.skip",
 ]
 show_missing = true
 fail_under = 100
 
 [tool.poetry]
 name = "django-pgbulk"
-packages = [
-  { include = "pgbulk" }
-]
-exclude = [
-  "*/tests/"
-]
-version = "2.2.0"
+packages = [{ include = "pgbulk" }]
+exclude = ["*/tests/"]
+version = "2.0.4"
 description = "Native postgres bulk update and upsert operations."
 authors = ["Wes Kendall"]
 classifiers = [

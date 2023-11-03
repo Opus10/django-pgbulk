@@ -1,19 +1,5 @@
 # Changelog
 
-## 2.2.0 (2023-11-26)
-
-### Feature
-
--   Django 5.0 compatibility [Wesley Kendall, e7848ed]
-
-    Support and test against Django 5 with psycopg2 and psycopg3.
-
-## 2.1.1 (2023-11-23)
-
-### Trivial
-
--   Add py.typed file, fix typing issues [Maxwell Muoto, 76f6e77]
-
 ## 2.1.0 (2023-11-03)
 
 ### Bug

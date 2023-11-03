@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.0 (2023-11-03)
+
+### Bug
+
+  - Allow updates on custom primary key fields [Wesley Kendall, 4dbfb1c]
+
+    `pgbulk.update` would fail on models with custom primary key fields when
+    no `update_fields` argument was supplied. This has been fixed.
+
 ## 2.0.4 (2023-10-10)
 
 ### Trivial

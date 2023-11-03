@@ -726,6 +726,12 @@ def test_upsert_some_updates_unique_int_char_field_queryset():
 
 
 @pytest.mark.django_db
+def test_update_custom_auto_field():
+    t_model = ddf.G(models.TestAutoFieldModel)
+    pgbulk.update(models.TestAutoFieldModel, [t_model])
+
+
+@pytest.mark.django_db
 def test_update_foreign_key_by_id():
     t_model = ddf.G(models.TestModel)
     t_fk_model = ddf.G(models.TestForeignKeyModel)

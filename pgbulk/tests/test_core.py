@@ -726,6 +726,7 @@ def test_upsert_some_updates_unique_int_char_field_queryset():
 
 
 @pytest.mark.django_db
+<<<<<<< HEAD
 def test_upsert_objs_with_excluded_fields():
     """
     Tests that we properly exclude fields when upserting
@@ -759,6 +760,8 @@ def test_upsert_objs_with_excluded_fields():
 
 
 @pytest.mark.django_db
+=======
+>>>>>>> 4dbfb1c (Allow updates on custom primary key fields)
 def test_update_custom_auto_field():
     t_model = ddf.G(models.TestAutoFieldModel)
     pgbulk.update(models.TestAutoFieldModel, [t_model])

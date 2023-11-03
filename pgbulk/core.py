@@ -1,6 +1,6 @@
 import itertools
 from collections import UserString, namedtuple
-from typing import Iterable, List, Union
+from typing import Iterable, List, Type, Union
 
 from asgiref.sync import sync_to_async
 from django.core.exceptions import ImproperlyConfigured
@@ -111,8 +111,7 @@ def _get_update_fields(queryset, to_update, exclude=None):
     """
     Get the fields to be updated in an upsert.
 
-    Always exclude auto_now_add, auto_created fields, and unique fields in an
-    update
+    Always exclude auto_now_add and primary key fields
     """
     exclude = exclude or []
     model = queryset.model
@@ -130,7 +129,7 @@ def _get_update_fields(queryset, to_update, exclude=None):
         if (
             attname not in exclude
             and not getattr(fields[attname], "auto_now_add", False)
-            and not fields[attname].auto_created
+            and not fields[attname].primary_key
         )
     ]
 
@@ -361,7 +360,7 @@ def _fetch(
 
 
 def _upsert(
-    queryset: Union[models.Model, models.QuerySet],
+    queryset: Union[Type[models.Model], models.QuerySet],
     model_objs: Iterable[models.Model],
     unique_fields: List[str],
     update_fields: UpdateFieldsTypeDef = None,
@@ -410,7 +409,7 @@ def _upsert(
 
 
 def update(
-    queryset: Union[models.Model, models.QuerySet],
+    queryset: Union[Type[models.Model], models.QuerySet],
     model_objs: Iterable[models.Model],
     update_fields: UpdateFieldsTypeDef = None,
 ) -> None:
@@ -518,7 +517,7 @@ def update(
 
 
 async def aupdate(
-    queryset: Union[models.Model, models.QuerySet],
+    queryset: Union[Type[models.Model], models.QuerySet],
     model_objs: Iterable[models.Model],
     update_fields: UpdateFieldsTypeDef = None,
 ) -> None:
@@ -536,7 +535,7 @@ async def aupdate(
 
 
 def upsert(
-    queryset: Union[models.Model, models.QuerySet],
+    queryset: Union[Type[models.Model], models.QuerySet],
     model_objs: Iterable[models.Model],
     unique_fields: List[str],
     update_fields: UpdateFieldsTypeDef = None,
@@ -664,7 +663,7 @@ def upsert(
 
 
 async def aupsert(
-    queryset: Union[models.Model, models.QuerySet],
+    queryset: Union[Type[models.Model], models.QuerySet],
     model_objs: Iterable[models.Model],
     unique_fields: List[str],
     update_fields: UpdateFieldsTypeDef = None,

@@ -411,7 +411,7 @@ def _upsert(
 def update(
     queryset: Union[Type[models.Model], models.QuerySet],
     model_objs: Iterable[models.Model],
-    update_fields: UpdateFieldsTypeDef = None,
+    update_fields: Union[List[str], None] = None,
 ) -> None:
     """
     Performs a bulk update.
@@ -519,7 +519,7 @@ def update(
 async def aupdate(
     queryset: Union[Type[models.Model], models.QuerySet],
     model_objs: Iterable[models.Model],
-    update_fields: UpdateFieldsTypeDef = None,
+    update_fields: Union[List[str], None] = None,
 ) -> None:
     """
     Perform an asynchronous bulk update.

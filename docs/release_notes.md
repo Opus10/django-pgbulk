@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1 (2023-11-22)
+
+### Trivial
+
+  - Add py.typed file, fix typing issues [Maxwell Muoto, 76f6e77]
+
 ## 2.1.0 (2023-11-03)
 
 ### Bug

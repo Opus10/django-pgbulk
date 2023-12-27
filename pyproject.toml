@@ -25,7 +25,7 @@ fail_under = 100
 name = "django-pgbulk"
 packages = [{ include = "pgbulk" }]
 exclude = ["*/tests/"]
-version = "2.1.0"
+version = "2.2.0"
 description = "Native postgres bulk update and upsert operations."
 authors = ["Wes Kendall"]
 classifiers = [

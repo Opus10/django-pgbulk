@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.3.0 (2023-12-27)
+
+### Feature
+
+  - Add `exclude` arguments to `pgbulk.upsert` and `pgbulk.update`. [Maxwell Muoto, cde5904]
+
+    Add `exclude` arguments to `pgbulk.upsert` and `pgbulk.update`.
+
+    Users can now use `exclude=["field_name"]` to exclude fields for updating or upserting data.
+
 ## 2.2.0 (2023-11-26)
 
 ### Feature

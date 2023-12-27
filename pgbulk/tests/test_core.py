@@ -726,6 +726,39 @@ def test_upsert_some_updates_unique_int_char_field_queryset():
 
 
 @pytest.mark.django_db
+def test_upsert_objs_with_excluded_fields():
+    """
+    Tests that we properly exclude fields when upserting
+    """
+    test_obj_1 = ddf.G(models.TestModel, int_field=1, float_field=1.0)
+    test_obj_2 = ddf.G(models.TestModel, int_field=2, float_field=2.0)
+
+    # Change the int and float fields on the models
+    test_obj_1.int_field = 3
+    test_obj_2.int_field = 4
+    test_obj_1.float_field = 3.0
+    test_obj_2.float_field = 4.0
+
+    pgbulk.upsert(
+        models.TestModel,
+        [test_obj_1, test_obj_2],
+        ["my_key"],
+        None,
+        exclude=["float_field"],
+    )
+    test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
+    test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
+
+    # The test objects int fields should be untouched
+    assert test_obj_1.int_field == 3
+    assert test_obj_2.int_field == 4
+
+    # The float fields should be updated
+    assert test_obj_1.float_field == 1.0
+    assert test_obj_2.float_field == 2.0
+
+
+@pytest.mark.django_db
 def test_update_custom_auto_field():
     t_model = ddf.G(models.TestAutoFieldModel)
     pgbulk.update(models.TestAutoFieldModel, [t_model])
@@ -1018,6 +1051,51 @@ def test_update_objects_with_custom_db_field_types():
     # Assert that the array field was updated
     assert test_obj_1.array_field, ["one", "two" == "updated"]
     assert test_obj_2.array_field, ["three", "four" == "updated"]
+
+
+@pytest.mark.django_db
+def test_update_objects_with_exclude():
+    """
+    Tests that we properly exclude fields when updating objects
+    """
+    test_obj_1 = ddf.G(
+        models.TestModel,
+        int_field=1,
+        float_field=1.0,
+        json_field={"test": "test"},
+        array_field=["one", "two"],
+    )
+    test_obj_2 = ddf.G(
+        models.TestModel,
+        int_field=2,
+        float_field=2.0,
+        json_field={"test2": "test2"},
+        array_field=["three", "four"],
+    )
+
+    # Change the fields on the models
+    test_obj_1.json_field = {"test": "updated"}
+    test_obj_1.array_field = ["one", "two", "updated"]
+
+    test_obj_2.json_field = {"test2": "updated"}
+    test_obj_2.array_field = ["three", "four", "updated"]
+
+    pgbulk.update(
+        models.TestModel,
+        [test_obj_1, test_obj_2],
+        None,
+        exclude=["array_field"],
+    )
+    test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
+    test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
+
+    # Assert that the json field was updated
+    assert test_obj_1.json_field == {"test": "updated"}
+    assert test_obj_2.json_field == {"test2": "updated"}
+
+    # Assert that the array field was not updated
+    assert test_obj_1.array_field == ["one", "two"]
+    assert test_obj_2.array_field == ["three", "four"]
 
 
 @pytest.mark.django_db

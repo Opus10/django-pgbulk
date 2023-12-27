@@ -14,3 +14,5 @@ INSTALLED_APPS = [
 DATABASES = {"default": dj_database_url.config()}
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
+USE_TZ = False

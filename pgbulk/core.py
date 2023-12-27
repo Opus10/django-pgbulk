@@ -9,9 +9,7 @@ from django.db.models.sql.compiler import SQLCompiler
 from django.utils import timezone
 from django.utils.version import get_version_tuple
 
-UpdateFieldsTypeDef = Union[
-    List[str], List["UpsertResult"], List[Union["UpsertResult", str]], None
-]
+UpdateFieldsTypeDef = Union[List[str], List["UpdateField"], List[Union["UpdateField", str]], None]
 
 
 def _psycopg_version():
@@ -363,6 +361,7 @@ def _upsert(
     queryset: Union[Type[models.Model], models.QuerySet],
     model_objs: Iterable[models.Model],
     unique_fields: List[str],
+    exclude: List[str],
     update_fields: UpdateFieldsTypeDef = None,
     returning: Union[List[str], bool] = False,
     redundant_updates: bool = False,
@@ -377,6 +376,9 @@ def _upsert(
         unique_fields: A list of fields that define the uniqueness
             of the model. The model must have a unique constraint on these
             fields.
+        exclude: A list of fields to exclude from the upsert. This is useful
+            when `update_fields` is `None` and you want to exclude fields from
+            being updated. This is additive to the `unique_fields` list.
         update_fields: A list of fields to update
             whenever objects already exist. If an empty list is provided, it
             is equivalent to doing a bulk insert on the objects that don't
@@ -396,7 +398,7 @@ def _upsert(
 
     # Sort the rows to reduce the chances of deadlock during concurrent upserts
     model_objs = _sort_by_unique_fields(queryset, model_objs, unique_fields)
-    update_fields = _get_update_fields(queryset, update_fields, exclude=unique_fields)
+    update_fields = _get_update_fields(queryset, update_fields, exclude=[*exclude, *unique_fields])
 
     return _fetch(
         queryset,
@@ -411,7 +413,8 @@ def _upsert(
 def update(
     queryset: Union[Type[models.Model], models.QuerySet],
     model_objs: Iterable[models.Model],
-    update_fields: UpdateFieldsTypeDef = None,
+    update_fields: Union[List[str], None] = None,
+    exclude: Union[List[str], None] = None,
 ) -> None:
     """
     Performs a bulk update.
@@ -421,6 +424,9 @@ def update(
         model_objs: Model object values to use for the update
         update_fields: A list of fields on the
             model objects to update. If `None`, all fields will be updated.
+        exclude: A list of fields to exclude from the upsert. This is useful
+            when `update_fields` is `None` and you want to exclude fields from
+            being updated. This is additive to the `unique_fields` list.
 
     Note:
         Model signals such as `post_save` are not emitted.
@@ -444,7 +450,7 @@ def update(
     queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
     connection = connections[queryset.db]
     model = queryset.model
-    update_fields = _get_update_fields(queryset, update_fields)
+    update_fields = _get_update_fields(queryset, update_fields, exclude)
 
     # Sort the model objects to reduce the likelihood of deadlocks
     model_objs = sorted(model_objs, key=lambda obj: obj.pk)
@@ -519,7 +525,8 @@ def update(
 async def aupdate(
     queryset: Union[Type[models.Model], models.QuerySet],
     model_objs: Iterable[models.Model],
-    update_fields: UpdateFieldsTypeDef = None,
+    update_fields: Union[List[str], None] = None,
+    exclude: Union[List[str], None] = None,
 ) -> None:
     """
     Perform an asynchronous bulk update.
@@ -531,7 +538,7 @@ async def aupdate(
         a `sync_to_async` wrapper. It does not yet use an asynchronous database
         driver but will in the future.
     """
-    return await sync_to_async(update)(queryset, model_objs, update_fields)
+    return await sync_to_async(update)(queryset, model_objs, update_fields, exclude)
 
 
 def upsert(
@@ -541,6 +548,7 @@ def upsert(
     update_fields: UpdateFieldsTypeDef = None,
     *,
     returning: Union[List[str], bool] = False,
+    exclude: Union[List[str], None] = None,
     redundant_updates: bool = False,
 ) -> UpsertResult:
     """
@@ -561,6 +569,9 @@ def upsert(
             it is updated, use the [pgbulk.UpdateField][] class. See examples below.
         returning: If True, returns all fields. If a list, only returns fields
             in the list. If False, do not return results from the upsert.
+        exclude: A list of fields to exclude from the upsert. This is useful
+            when `update_fields` is `None` and you want to exclude fields from
+            being updated. This is additive to the `unique_fields` list.
         redundant_updates: Perform an update
             even if all columns are identical to the row in the database.
 
@@ -658,6 +669,7 @@ def upsert(
         unique_fields,
         update_fields=update_fields,
         returning=returning,
+        exclude=exclude or [],
         redundant_updates=redundant_updates,
     )
 
@@ -669,6 +681,7 @@ async def aupsert(
     update_fields: UpdateFieldsTypeDef = None,
     *,
     returning: Union[List[str], bool] = False,
+    exclude: Union[List[str], None] = None,
     redundant_updates: bool = False,
 ) -> UpsertResult:
     """
@@ -687,5 +700,6 @@ async def aupsert(
         unique_fields,
         update_fields,
         returning=returning,
+        exclude=exclude or [],
         redundant_updates=redundant_updates,
     )

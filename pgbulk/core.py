@@ -161,9 +161,11 @@ def _prep_sql_args(queryset, connection, cursor, sql_args):
     compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)
 
     return [
-        Literal(cursor.mogrify(*sql_arg.as_sql(compiler, connection)).decode("utf-8"))
-        if hasattr(sql_arg, "as_sql")
-        else sql_arg
+        (
+            Literal(cursor.mogrify(*sql_arg.as_sql(compiler, connection)).decode("utf-8"))
+            if hasattr(sql_arg, "as_sql")
+            else sql_arg
+        )
         for sql_arg in sql_args
     ]
 
@@ -253,7 +255,9 @@ def _get_upsert_sql(
     all_fields = [
         field
         for field in model._meta.fields
-        if field.column in unique_fields or not isinstance(field, models.AutoField)
+        if field.column in unique_fields
+        or not isinstance(field, models.AutoField)
+        and field.concrete
     ]
 
     all_field_names = [field.column for field in all_fields]

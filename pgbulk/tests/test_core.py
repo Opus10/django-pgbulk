@@ -40,7 +40,7 @@ def test_func_field_upsert():
         models.TestFuncFieldModel,
         [models.TestFuncFieldModel(my_key="a", int_val=-2)],
         ["my_key"],
-        [pgbulk.UpdateField("int_val")],
+        ["int_val"],
         redundant_updates=False,
         returning=True,
     )
@@ -95,7 +95,7 @@ def test_auto_field_upsert():
     pgbulk.upsert(
         models.TestAutoFieldModel,
         [models.TestAutoFieldModel(widget="widget", data="data")],
-        [pgbulk.UpdateField("widget")],
+        ["widget"],
         ["data"],
     )
 

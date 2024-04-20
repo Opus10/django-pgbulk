@@ -1,6 +1,16 @@
 import itertools
-from collections import UserString, namedtuple
-from typing import Iterable, List, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    List,
+    NamedTuple,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from asgiref.sync import sync_to_async
 from django.core.exceptions import ImproperlyConfigured
@@ -8,11 +18,30 @@ from django.db import connections, models
 from django.db.models.sql.compiler import SQLCompiler
 from django.utils import timezone
 from django.utils.version import get_version_tuple
+from typing_extensions import TypeAlias
 
-UpdateFieldsTypeDef = Union[List[str], List["UpdateField"], List[Union["UpdateField", str]], None]
+UpdateFieldsTypeDef: TypeAlias = Union[
+    List[str], List["UpdateField"], List[Union["UpdateField", str]], None
+]
+_M = TypeVar("_M", bound=models.Model)
+QuerySet: TypeAlias = Union[Type[_M], models.QuerySet[_M]]
+AnyField: TypeAlias = "models.Field[Any, Any]"
+Expression: TypeAlias = "models.Expression | models.F"
 
 
-def _psycopg_version():
+if TYPE_CHECKING:
+    from django.db import DefaultConnectionProxy
+    from django.db.backends.utils import CursorWrapper
+
+    class Row(NamedTuple):
+        """Represents a row returned by an upsert operation."""
+
+        status_: str
+
+        def __getattr__(self, item: str) -> Any: ...
+
+
+def _psycopg_version() -> Tuple[int, int, int]:
     try:
         import psycopg as Database  # type: ignore
     except ImportError:
@@ -20,7 +49,7 @@ def _psycopg_version():
     except Exception as exc:  # pragma: no cover
         raise ImproperlyConfigured("Error loading psycopg2 or psycopg module") from exc
 
-    version_tuple = get_version_tuple(Database.__version__.split(" ", 1)[0])
+    version_tuple = get_version_tuple(Database.__version__.split(" ", 1)[0])  # type: ignore
 
     if version_tuple[0] not in (2, 3):  # pragma: no cover
         raise ImproperlyConfigured(f"Pysocpg version {version_tuple[0]} not supported")
@@ -33,26 +62,26 @@ psycopg_maj_version = psycopg_version[0]
 
 
 if psycopg_maj_version == 2:
-    from psycopg2.extensions import AsIs as Literal
+    from psycopg2.extensions import AsIs as Literal  # type: ignore
 elif psycopg_maj_version == 3:
-    import psycopg.adapt
+    import psycopg.adapt  # type: ignore
 
     class Literal:  # pragma: no cover
-        def __init__(self, val):
+        def __init__(self, val: str) -> None:
             self.val = val
 
-    class LiteralDumper(psycopg.adapt.Dumper):  # pragma: no cover
-        def dump(self, obj):
+    class LiteralDumper(psycopg.adapt.Dumper):  # pragma: no cover # type: ignore
+        def dump(self, obj: Any) -> bytes:
             return obj.val.encode("utf-8")
 
-        def quote(self, obj):
+        def quote(self, obj: Any) -> bytes:
             return self.dump(obj)
 
 else:
     raise AssertionError
 
 
-class UpdateField(UserString):
+class UpdateField(str):
     """
     For expressing an update field as an expression to an upsert
     operation.
@@ -75,12 +104,15 @@ class UpdateField(UserString):
         )
     """
 
-    def __init__(self, field: str, expression: Union[models.Expression, None] = None):
-        self.data = field
-        self.expression = expression
+    expression: Expression
+
+    def __new__(cls, field: str, expression: Expression) -> "UpdateField":
+        obj = super().__new__(cls, field)
+        obj.expression = expression
+        return obj
 
 
-class UpsertResult(list):
+class UpsertResult(list["Row"]):
     """
     Returned by [pgbulk.upsert][] when the `returning` argument is provided.
 
@@ -91,21 +123,25 @@ class UpsertResult(list):
     """
 
     @property
-    def created(self) -> List[namedtuple]:
+    def created(self) -> List["Row"]:
         """Return the created rows"""
         return [i for i in self if i.status_ == "c"]
 
     @property
-    def updated(self) -> List[namedtuple]:
+    def updated(self) -> List["Row"]:
         """Return the updated rows"""
         return [i for i in self if i.status_ == "u"]
 
 
-def _quote(field):
+def _quote(field: str) -> str:
     return '"{0}"'.format(field)
 
 
-def _get_update_fields(queryset, to_update, exclude=None):
+def _get_update_fields(
+    queryset: models.QuerySet[models.Model],
+    to_update: UpdateFieldsTypeDef,
+    exclude: Union[List[str], None] = None,
+) -> List[Union[str, UpdateField]]:
     """
     Get the fields to be updated in an upsert.
 
@@ -134,7 +170,7 @@ def _get_update_fields(queryset, to_update, exclude=None):
     return to_update
 
 
-def _fill_auto_fields(queryset, values):
+def _fill_auto_fields(queryset: models.QuerySet[_M], values: Iterable[_M]) -> Iterable[_M]:
     """
     Given a list of models, fill in auto_now and auto_now_add fields
     for upserts. Since django manager utils passes Django's ORM, these values
@@ -154,11 +190,16 @@ def _fill_auto_fields(queryset, values):
     return values
 
 
-def _prep_sql_args(queryset, connection, cursor, sql_args):
+def _prep_sql_args(
+    queryset: models.QuerySet[_M],
+    connection: "DefaultConnectionProxy",
+    cursor: "CursorWrapper",
+    sql_args: List[Any],
+) -> List[Any]:
     if psycopg_maj_version == 3:
-        cursor.adapters.register_dumper(Literal, LiteralDumper)
+        cursor.adapters.register_dumper(Literal, LiteralDumper)  # type: ignore
 
-    compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)
+    compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)  # type: ignore
 
     return [
         Literal(cursor.mogrify(*sql_arg.as_sql(compiler, connection)).decode("utf-8"))
@@ -168,7 +209,12 @@ def _prep_sql_args(queryset, connection, cursor, sql_args):
     ]
 
 
-def _get_field_db_val(queryset, field, value, connection):
+def _get_field_db_val(
+    queryset: models.QuerySet[_M],
+    field: AnyField,
+    value: Any,
+    connection: "DefaultConnectionProxy",
+) -> Any:
     if hasattr(value, "resolve_expression"):  # pragma: no cover
         # Handle cases when the field is of type "Func" and other expressions.
         # This is useful for libraries like django-rdkit that can't easily be tested
@@ -177,7 +223,11 @@ def _get_field_db_val(queryset, field, value, connection):
         return field.get_db_prep_save(value, connection)
 
 
-def _sort_by_unique_fields(queryset, model_objs, unique_fields):
+def _sort_by_unique_fields(
+    queryset: models.QuerySet[_M],
+    model_objs: Iterable[_M],
+    unique_fields: List[str],
+) -> List[_M]:
     """
     Sort a list of models by their unique fields.
 
@@ -186,18 +236,22 @@ def _sort_by_unique_fields(queryset, model_objs, unique_fields):
     """
     model = queryset.model
     connection = connections[queryset.db]
-    unique_fields = [field for field in model._meta.fields if field.attname in unique_fields]
+    unique_db_fields = [field for field in model._meta.fields if field.attname in unique_fields]
 
-    def sort_key(model_obj):
+    def sort_key(model_obj: _M) -> Tuple[Any, ...]:
         return tuple(
             _get_field_db_val(queryset, field, getattr(model_obj, field.attname), connection)
-            for field in unique_fields
+            for field in unique_db_fields
         )
 
     return sorted(model_objs, key=sort_key)
 
 
-def _get_values_for_row(queryset, model_obj, all_fields):
+def _get_values_for_row(
+    queryset: models.QuerySet[_M],
+    model_obj: _M,
+    all_fields: List[AnyField],
+) -> List[Any]:
     connection = connections[queryset.db]
     return [
         # Convert field value to db value
@@ -207,10 +261,14 @@ def _get_values_for_row(queryset, model_obj, all_fields):
     ]
 
 
-def _get_values_for_rows(queryset, model_objs, all_fields):
+def _get_values_for_rows(
+    queryset: models.QuerySet[_M],
+    model_objs: Iterable[_M],
+    all_fields: List[AnyField],
+) -> Tuple[List[str], List[Any]]:
     connection = connections[queryset.db]
-    row_values = []
-    sql_args = []
+    row_values: List[str] = []
+    sql_args: List[Any] = []
 
     for i, model_obj in enumerate(model_objs):
         sql_args.extend(_get_values_for_row(queryset, model_obj, all_fields))
@@ -226,20 +284,20 @@ def _get_values_for_rows(queryset, model_objs, all_fields):
     return row_values, sql_args
 
 
-def _get_return_fields_sql(returning):
+def _get_return_fields_sql(returning: List[str]) -> str:
     return_fields_sql = ", ".join(_quote(field) for field in returning)
     return_fields_sql += ", CASE WHEN xmax = 0 THEN 'c' ELSE 'u' END AS status_"
     return return_fields_sql
 
 
 def _get_upsert_sql(
-    queryset,
-    model_objs,
-    unique_fields,
-    update_fields,
-    returning,
-    redundant_updates=False,
-):
+    queryset: models.QuerySet[_M],
+    model_objs: Iterable[_M],
+    unique_fields: List[str],
+    update_fields: List[Union[str, UpdateField]],
+    returning: Union[List[str], bool],
+    redundant_updates: bool = False,
+) -> Tuple[str, List[Any]]:
     """
     Generates the postgres specific sql necessary to perform an upsert
     (ON CONFLICT) INSERT INTO table_name (field1, field2)
@@ -247,7 +305,7 @@ def _get_upsert_sql(
     ON CONFLICT (unique_field) DO UPDATE SET field2 = EXCLUDED.field2;
     """
     model = queryset.model
-    update_expressions = {f: f.expression for f in update_fields if getattr(f, "expression", None)}
+    update_expressions = {f: f.expression for f in update_fields if isinstance(f, UpdateField)}
 
     # Use all fields except pk unless the uniqueness constraint is the pk field
     all_fields = [
@@ -261,22 +319,22 @@ def _get_upsert_sql(
     all_field_names_sql = ", ".join([_quote(field) for field in all_field_names])
 
     # Convert field names to db column names
-    unique_fields = [model._meta.get_field(unique_field) for unique_field in unique_fields]
-    update_fields = [model._meta.get_field(update_field) for update_field in update_fields]
+    unique_db_fields = [model._meta.get_field(unique_field) for unique_field in unique_fields]
+    update_db_fields = [model._meta.get_field(update_field) for update_field in update_fields]
 
     row_values, sql_args = _get_values_for_rows(queryset, model_objs, all_fields)
 
-    unique_field_names_sql = ", ".join([_quote(field.column) for field in unique_fields])
+    unique_field_names_sql = ", ".join([_quote(field.column) for field in unique_db_fields])
     update_fields_expressions = {
-        field.column: f"EXCLUDED.{_quote(field.column)}" for field in update_fields
+        field.column: f"EXCLUDED.{_quote(field.column)}" for field in update_db_fields
     }
     if update_expressions:
         connection = connections[queryset.db]
-        compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)
+        compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)  # type: ignore
         with connection.cursor() as cursor:
             for field_name, expr in update_expressions.items():
                 expr = expr.resolve_expression(queryset.query, allow_joins=False, for_save=True)
-                val = cursor.mogrify(*expr.as_sql(compiler, connection))
+                val = cast(bytes | str, cursor.mogrify(*expr.as_sql(compiler, connection)))
                 if isinstance(val, bytes):  # Psycopg 2/3 return different types
                     val = val.decode("utf-8")
 
@@ -284,7 +342,7 @@ def _get_upsert_sql(
 
     update_fields_sql = ", ".join(
         f"{_quote(field.column)} = {update_fields_expressions[field.column]}"
-        for field in update_fields
+        for field in update_db_fields
     )
 
     return_sql = "RETURNING " + _get_return_fields_sql(returning) if returning else ""
@@ -295,7 +353,7 @@ def _get_upsert_sql(
         ).format(
             update_fields_sql=", ".join(
                 "{0}.{1}".format(model._meta.db_table, _quote(field.column))
-                for field in update_fields
+                for field in update_db_fields
             ),
             excluded_update_fields_sql=", ".join(update_fields_expressions.values()),
         )
@@ -324,18 +382,18 @@ def _get_upsert_sql(
 
 
 def _fetch(
-    queryset,
-    model_objs,
-    unique_fields,
-    update_fields,
-    returning,
-    redundant_updates=False,
+    queryset: models.QuerySet[_M],
+    model_objs: Iterable[_M],
+    unique_fields: List[str],
+    update_fields: List[Union[str, UpdateField]],
+    returning: Union[List[str], bool],
+    redundant_updates: bool = False,
 ):
     """
     Perfom the upsert
     """
     connection = connections[queryset.db]
-    upserted = []
+    upserted: List["Row"] = []
 
     if model_objs:
         sql, sql_args = _get_upsert_sql(
@@ -351,15 +409,16 @@ def _fetch(
             sql_args = _prep_sql_args(queryset, connection, cursor, sql_args)
             cursor.execute(sql, sql_args)
             if cursor.description:
-                nt_result = namedtuple("Result", [col[0] for col in cursor.description])
-                upserted = [nt_result(*row) for row in cursor.fetchall()]
+                result = [(col.name, Any) for col in cursor.description]
+                nt_result = NamedTuple("Result", result)
+                upserted = cast(List["Row"], [nt_result(*row) for row in cursor.fetchall()])
 
     return UpsertResult(upserted)
 
 
 def _upsert(
-    queryset: Union[Type[models.Model], models.QuerySet],
-    model_objs: Iterable[models.Model],
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
     unique_fields: List[str],
     update_fields: UpdateFieldsTypeDef = None,
     exclude: Union[List[str], None] = None,
@@ -412,8 +471,8 @@ def _upsert(
 
 
 def update(
-    queryset: Union[Type[models.Model], models.QuerySet],
-    model_objs: Iterable[models.Model],
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
     update_fields: Union[List[str], None] = None,
     exclude: Union[List[str], None] = None,
 ) -> None:
@@ -448,21 +507,24 @@ def update(
                 ['some_attr']
             )
     """
-    queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
-    connection = connections[queryset.db]
-    model = queryset.model
-    update_fields = _get_update_fields(queryset, update_fields, exclude)
+    model_qset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
+    connection = connections[model_qset.db]
+    model = model_qset.model
+    upsert_update_fields = _get_update_fields(model_qset, update_fields, exclude)
 
     # Sort the model objects to reduce the likelihood of deadlocks
     model_objs = sorted(model_objs, key=lambda obj: obj.pk)
 
-    # Add the pk to the value fields so we can join during the update
-    value_fields = [model._meta.pk.attname] + update_fields
+    if not model._meta.pk:  # pragma: no cover - for type-safety
+        raise ValueError("Model must have a primary key to perform a bulk update.")
+
+    # Add the pk to the value fields so we can join during the update.
+    value_fields = [model._meta.pk.attname] + upsert_update_fields
 
     row_values = [
         [
             _get_field_db_val(
-                queryset,
+                model_qset,
                 model_obj._meta.get_field(field),
                 getattr(model_obj, model_obj._meta.get_field(field).attname),
                 connection,
@@ -473,8 +535,8 @@ def update(
     ]
 
     # If we do not have any values or fields to update, just return
-    if len(row_values) == 0 or len(update_fields) == 0:
-        return []
+    if len(row_values) == 0 or len(upsert_update_fields) == 0:
+        return None
 
     db_types = [model._meta.get_field(field).db_type(connection) for field in value_fields]
 
@@ -485,7 +547,7 @@ def update(
     update_fields_sql = ", ".join(
         [
             '"{field}" = "new_values"."{field}"'.format(field=model._meta.get_field(field).column)
-            for field in update_fields
+            for field in upsert_update_fields
         ]
     )
 
@@ -519,13 +581,13 @@ def update(
     update_sql_params = list(itertools.chain(*row_values))
 
     with connection.cursor() as cursor:
-        update_sql_params = _prep_sql_args(queryset, connection, cursor, update_sql_params)
+        update_sql_params = _prep_sql_args(model_qset, connection, cursor, update_sql_params)
         return cursor.execute(update_sql, update_sql_params)
 
 
 async def aupdate(
-    queryset: Union[Type[models.Model], models.QuerySet],
-    model_objs: Iterable[models.Model],
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
     update_fields: Union[List[str], None] = None,
     exclude: Union[List[str], None] = None,
 ) -> None:
@@ -543,8 +605,8 @@ async def aupdate(
 
 
 def upsert(
-    queryset: Union[Type[models.Model], models.QuerySet],
-    model_objs: Iterable[models.Model],
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
     unique_fields: List[str],
     update_fields: UpdateFieldsTypeDef = None,
     *,
@@ -676,8 +738,8 @@ def upsert(
 
 
 async def aupsert(
-    queryset: Union[Type[models.Model], models.QuerySet],
-    model_objs: Iterable[models.Model],
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
     unique_fields: List[str],
     update_fields: UpdateFieldsTypeDef = None,
     *,

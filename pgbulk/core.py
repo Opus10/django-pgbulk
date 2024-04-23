@@ -20,7 +20,7 @@ def _psycopg_version():
     except Exception as exc:  # pragma: no cover
         raise ImproperlyConfigured("Error loading psycopg2 or psycopg module") from exc
 
-    version_tuple = get_version_tuple(Database.__version__.split(" ", 1)[0])
+    version_tuple = get_version_tuple(Database.__version__.split(" ", 1)[0])  # type: ignore
 
     if version_tuple[0] not in (2, 3):  # pragma: no cover
         raise ImproperlyConfigured(f"Pysocpg version {version_tuple[0]} not supported")
@@ -33,9 +33,9 @@ psycopg_maj_version = psycopg_version[0]
 
 
 if psycopg_maj_version == 2:
-    from psycopg2.extensions import AsIs as Literal
+    from psycopg2.extensions import AsIs as Literal  # type: ignore
 elif psycopg_maj_version == 3:
-    import psycopg.adapt
+    import psycopg.adapt  # type: ignore
 
     class Literal:  # pragma: no cover
         def __init__(self, val):
@@ -91,12 +91,12 @@ class UpsertResult(list):
     """
 
     @property
-    def created(self) -> List[namedtuple]:
+    def created(self) -> List[namedtuple]:  # type: ignore
         """Return the created rows"""
         return [i for i in self if i.status_ == "c"]
 
     @property
-    def updated(self) -> List[namedtuple]:
+    def updated(self) -> List[namedtuple]:  # type: ignore
         """Return the updated rows"""
         return [i for i in self if i.status_ == "u"]
 
@@ -349,7 +349,7 @@ def _fetch(
 
         with connection.cursor() as cursor:
             sql_args = _prep_sql_args(queryset, connection, cursor, sql_args)
-            cursor.execute(sql, sql_args)
+            cursor.execute(sql, sql_args)  # type: ignore
             if cursor.description:
                 nt_result = namedtuple("Result", [col[0] for col in cursor.description])
                 upserted = [nt_result(*row) for row in cursor.fetchall()]
@@ -392,7 +392,7 @@ def _upsert(
             if all columns are identical to the row in the database.
     """
     exclude = exclude or []
-    queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
+    queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()  # type: ignore
 
     # Populate automatically generated fields in the rows like date times
     _fill_auto_fields(queryset, model_objs)
@@ -448,7 +448,7 @@ def update(
                 ['some_attr']
             )
     """
-    queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
+    queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()  # type: ignore
     connection = connections[queryset.db]
     model = queryset.model
     update_fields = _get_update_fields(queryset, update_fields, exclude)
@@ -464,7 +464,7 @@ def update(
             _get_field_db_val(
                 queryset,
                 model_obj._meta.get_field(field),
-                getattr(model_obj, model_obj._meta.get_field(field).attname),
+                getattr(model_obj, model_obj._meta.get_field(field).attname),  # type: ignore
                 connection,
             )
             for field in value_fields
@@ -474,7 +474,7 @@ def update(
 
     # If we do not have any values or fields to update, just return
     if len(row_values) == 0 or len(update_fields) == 0:
-        return []
+        return
 
     db_types = [model._meta.get_field(field).db_type(connection) for field in value_fields]
 
@@ -520,7 +520,7 @@ def update(
 
     with connection.cursor() as cursor:
         update_sql_params = _prep_sql_args(queryset, connection, cursor, update_sql_params)
-        return cursor.execute(update_sql, update_sql_params)
+        cursor.execute(update_sql, update_sql_params)  # type: ignore
 
 
 async def aupdate(

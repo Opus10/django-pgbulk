@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.4.0 (2024-04-23)
+
+### Bug
+
+  - Fix operations on virtual and generated fields. [Darlin Alberto, 852a492]
+
+    Using non-concrete fields such as django-hashids HashidsField and the new
+    Generatedfield in Django 5 previously produced errors during upsert and
+    update operations. These fields are now fully supported.
+
+### Trivial
+
+  - Update with the latest Python library template. [Wesley Kendall, 6a00a64]
+
 ## 2.3.1 (2024-04-06)
 
 ### Trivial

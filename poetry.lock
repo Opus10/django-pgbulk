@@ -460,6 +460,20 @@ files = [
 ]
 
 [[package]]
+name = "django-hashids"
+version = "0.7.0"
+description = "Non-intrusive hashids library for Django"
+optional = false
+python-versions = ">=3.6.2,<4"
+files = [
+    {file = "django_hashids-0.7.0-py3-none-any.whl", hash = "sha256:a5d91bda97c46afa08972d9e85143af79d9e2f8d754f3d3f0df6b8ac8f57b92b"},
+    {file = "django_hashids-0.7.0.tar.gz", hash = "sha256:dce33e6f002308cbe03ca9ec80e27ce6b469e3abf2a42df8ba3381724683690b"},
+]
+
+[package.dependencies]
+hashids = ">=1.0.2"
+
+[[package]]
 name = "django-stubs"
 version = "4.2.7"
 description = "Mypy stubs for Django"
@@ -642,6 +656,20 @@ files = [
 [package.dependencies]
 astunparse = {version = ">=1.6", markers = "python_version < \"3.9\""}
 colorama = ">=0.4"
+
+[[package]]
+name = "hashids"
+version = "1.3.1"
+description = "Implements the hashids algorithm in python. For more information, visit http://hashids.org/"
+optional = false
+python-versions = ">=2.7"
+files = [
+    {file = "hashids-1.3.1-py2.py3-none-any.whl", hash = "sha256:8bddd1acba501bfc9306e7e5a99a1667f4f2cacdc20cbd70bcc5ddfa5147c94c"},
+    {file = "hashids-1.3.1.tar.gz", hash = "sha256:6c3dc775e65efc2ce2c157a65acb776d634cb814598f406469abef00ae3f635c"},
+]
+
+[package.extras]
+test = ["pytest (>=2.1.0)"]
 
 [[package]]
 name = "idna"
@@ -1901,4 +1929,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8.0,<4"
-content-hash = "ddc4c1d9e66d7db92c7370283519d8372e57314d630721633336920570527da2"
+content-hash = "1eb99166fd8b3b1dd5decbcfefc5a546028ce91fabcef9050298b3b6675f8129"

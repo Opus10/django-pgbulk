@@ -12,6 +12,23 @@ from pgbulk.tests import models
 
 
 @pytest.mark.django_db
+def test_non_concrete_field():
+    """Tests upserts and updates on non-concrete fields"""
+    upsert_results = pgbulk.upsert(
+        models.TestNonConcreteField,
+        [models.TestNonConcreteField(int_field=1)],
+        ["int_field"],
+        returning=True,
+    )
+    assert len(upsert_results.created) == 1
+    assert not upsert_results.updated
+
+    non_concrete = models.TestNonConcreteField.objects.get()
+    non_concrete.int_field = 2
+    pgbulk.update(models.TestNonConcreteField, [non_concrete])
+
+
+@pytest.mark.django_db
 def test_func_field_upsert():
     """Tests the effects of setting a field to upsert using an F object"""
     models.TestFuncFieldModel.objects.create(my_key="a", int_val=0)

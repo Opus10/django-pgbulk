@@ -83,6 +83,7 @@ dj-database-url = "2.1.0"
 psycopg2-binary = "2.9.9"
 pytest-django = "4.5.2"
 django-dynamic-fixture = "4.0.1"
+django-hashids = "0.7.0"
 
 [tool.pytest.ini_options]
 xfail_strict = true

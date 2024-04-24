@@ -109,17 +109,17 @@ def _get_update_fields(queryset, to_update, exclude=None):
     """
     Get the fields to be updated in an upsert.
 
-    Always exclude auto_now_add and primary key fields
+    Always exclude auto_now_add, primary key, generated, and non-concrete fields
     """
     exclude = exclude or []
     model = queryset.model
     fields = {
-        **{field.attname: field for field in model._meta.fields},
-        **{field.name: field for field in model._meta.fields},
+        **{field.attname: field for field in _model_fields(model)},
+        **{field.name: field for field in _model_fields(model)},
     }
 
     if to_update is None:
-        to_update = [field.attname for field in model._meta.fields]
+        to_update = [field.attname for field in _model_fields(model)]
 
     to_update = [
         attname
@@ -143,7 +143,7 @@ def _fill_auto_fields(queryset, values):
     model = queryset.model
     auto_field_names = [
         f.attname
-        for f in model._meta.fields
+        for f in _model_fields(model)
         if getattr(f, "auto_now", False) or getattr(f, "auto_now_add", False)
     ]
     now = timezone.now()
@@ -186,7 +186,7 @@ def _sort_by_unique_fields(queryset, model_objs, unique_fields):
     """
     model = queryset.model
     connection = connections[queryset.db]
-    unique_fields = [field for field in model._meta.fields if field.attname in unique_fields]
+    unique_fields = [field for field in _model_fields(model) if field.attname in unique_fields]
 
     def sort_key(model_obj):
         return tuple(
@@ -232,6 +232,11 @@ def _get_return_fields_sql(returning):
     return return_fields_sql
 
 
+def _model_fields(model: models.Model) -> List[models.Field]:
+    """Return the fields of a model, excluding generated and non-concrete ones."""
+    return [f for f in model._meta.fields if not getattr(f, "generated", False) and f.concrete]
+
+
 def _get_upsert_sql(
     queryset,
     model_objs,
@@ -252,12 +257,12 @@ def _get_upsert_sql(
     # Use all fields except pk unless the uniqueness constraint is the pk field
     all_fields = [
         field
-        for field in model._meta.fields
+        for field in _model_fields(model)
         if field.column in unique_fields or not isinstance(field, models.AutoField)
     ]
 
     all_field_names = [field.column for field in all_fields]
-    returning = returning if returning is not True else [f.column for f in model._meta.fields]
+    returning = returning if returning is not True else [f.column for f in _model_fields(model)]
     all_field_names_sql = ", ".join([_quote(field) for field in all_field_names])
 
     # Convert field names to db column names

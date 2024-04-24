@@ -1,5 +1,6 @@
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
+from django_hashids import HashidsField
 from timezone_field import TimeZoneField
 
 
@@ -55,6 +56,13 @@ class TestAutoDateTimeModel(models.Model):
     int_field = models.IntegerField(unique=True)
     auto_now_field = models.DateTimeField(auto_now=True)
     auto_now_add_field = models.DateTimeField(auto_now_add=True)
+
+
+class TestNonConcreteField(models.Model):
+    """A model to test non-concrete fields."""
+
+    hashid = HashidsField(real_field_name="id")
+    int_field = models.IntegerField(unique=True)
 
 
 class TestForeignKeyModel(models.Model):

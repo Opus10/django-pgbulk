@@ -1,6 +1,12 @@
 # Changelog
 
-## 2.4.0 (2024-04-23)
+## 2.5.0 (2024-08-09)
+
+### Feature
+
+  - Fix typing errors allowing for strict type-safety with Pyright. [Maxwell Muoto, 8158596]
+
+## 2.4.0 (2024-04-24)
 
 ### Bug
 

@@ -2,13 +2,13 @@
 
 ## 2.5.0 (2024-08-09)
 
-### Feature
+#### Feature
 
   - Fix typing errors allowing for strict type-safety with Pyright. [Maxwell Muoto, 8158596]
 
 ## 2.4.0 (2024-04-24)
 
-### Bug
+#### Bug
 
   - Fix operations on virtual and generated fields. [Darlin Alberto, 852a492]
 
@@ -16,19 +16,19 @@
     Generatedfield in Django 5 previously produced errors during upsert and
     update operations. These fields are now fully supported.
 
-### Trivial
+#### Trivial
 
   - Update with the latest Python library template. [Wesley Kendall, 6a00a64]
 
 ## 2.3.1 (2024-04-06)
 
-### Trivial
+#### Trivial
 
   - Fix ReadTheDocs builds. [Wesley Kendall, 93965a9]
 
 ## 2.3.0 (2023-12-27)
 
-### Feature
+#### Feature
 
   - Add `exclude` arguments to `pgbulk.upsert` and `pgbulk.update`. [Maxwell Muoto, cde5904]
 
@@ -38,7 +38,7 @@
 
 ## 2.2.0 (2023-11-26)
 
-### Feature
+#### Feature
 
   - Django 5.0 compatibility [Wesley Kendall, e7848ed]
 
@@ -46,13 +46,13 @@
 
 ## 2.1.1 (2023-11-23)
 
-### Trivial
+#### Trivial
 
   - Add py.typed file, fix typing issues [Maxwell Muoto, 76f6e77]
 
 ## 2.1.0 (2023-11-03)
 
-### Bug
+#### Bug
 
   - Allow updates on custom primary key fields [Wesley Kendall, 4dbfb1c]
 
@@ -61,31 +61,31 @@
 
 ## 2.0.4 (2023-10-10)
 
-### Trivial
+#### Trivial
 
   - Improve base type annotations, avoid type annotations in comments [Maxwell Muoto, 862e253]
 
 ## 2.0.3 (2023-10-09)
 
-### Trivial
+#### Trivial
 
   - Added Opus10 branding to docs [Wesley Kendall, c2f9d18]
 
 ## 2.0.2 (2023-10-08)
 
-### Trivial
+#### Trivial
 
   - Add additional docs and notes around async usaged and model signals. [Wesley Kendall, 4cce843]
 
 ## 2.0.1 (2023-10-08)
 
-### Trivial
+#### Trivial
 
   - Fix release notes [Wesley Kendall, 8a88b7a]
 
 ## 2.0.0 (2023-10-08)
 
-### Api-Break
+#### Api-Break
 
   - Python 3.12 / async support, dropping of `pgbulk.sync` and `return_untouched` [Wesley Kendall, de70607]
 
@@ -105,7 +105,7 @@
 
 ## 1.4.0 (2023-06-08)
 
-### Feature
+#### Feature
 
   - Added Python 3.11, Django 4.2, and Psycopg 3 support [Wesley Kendall, f606b0b]
 
@@ -113,57 +113,57 @@
 
 ## 1.3.0 (2022-12-12)
 
-### Feature
+#### Feature
 
   - Sort bulk update objects [Wesley Kendall, f766617]
 
     Objects passed to ``pgbulk.update`` are now sorted to reduce the likelihood of
     a deadlock when executed concurrently.
 
-### Trivial
+#### Trivial
 
   - Updated with latest Python template [Wesley Kendall, 9652cd2]
   - Updated with latest Django template [Wesley Kendall, 6ef27e6]
 
 ## 1.2.6 (2022-08-26)
 
-### Trivial
+#### Trivial
 
   - Test against Django 4.1 and other CI improvements [Wes Kendall, 9eedff4]
 
 ## 1.2.5 (2022-08-24)
 
-### Trivial
+#### Trivial
 
   - Fix ReadTheDocs builds [Wes Kendall, 15832a5]
 
 ## 1.2.4 (2022-08-20)
 
-### Trivial
+#### Trivial
 
   - Updated with latest Django template [Wes Kendall, 4e9e095]
 
 ## 1.2.3 (2022-08-20)
 
-### Trivial
+#### Trivial
 
   - Fix release note rendering and code formatting changes [Wes Kendall, 94f1192]
 
 ## 1.2.2 (2022-08-17)
 
-### Trivial
+#### Trivial
 
   - README and intro documentation fix [Wes Kendall, e75930e]
 
 ## 1.2.1 (2022-07-31)
 
-### Trivial
+#### Trivial
 
   - Updated with latest Django template, fixing doc builds [Wes Kendall, c3ed424]
 
 ## 1.2.0 (2022-03-14)
 
-### Feature
+#### Feature
 
   - Handle func-based fields and allow expressions in upserts [Wes Kendall, 64458c5]
 
@@ -179,13 +179,13 @@
 
 ## 1.1.1 (2022-03-14)
 
-### Trivial
+#### Trivial
 
   - Updates to latest template, dropping py3.6 support and adding Django4 support [Wes Kendall, 35a04b0]
 
 ## 1.1.0 (2022-01-08)
 
-### Bug
+#### Bug
 
   - Fix error when upserting custom AutoFields [Wes Kendall, 114eb45]
 
@@ -194,19 +194,19 @@
 
 ## 1.0.2 (2021-06-06)
 
-### Trivial
+#### Trivial
 
   - Updated with the latest Django template [Wes Kendall, 71a2678]
 
 ## 1.0.1 (2020-06-29)
 
-### Trivial
+#### Trivial
 
   - Update with the latest public django app template. [Wes Kendall, 271b456]
 
 ## 1.0.0 (2020-06-27)
 
-### Api-Break
+#### Api-Break
 
   - Initial release of django-pgbulk. [Wes Kendall, 7070a26]
 

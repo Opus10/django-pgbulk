@@ -2,13 +2,18 @@
 
 `django-pgbulk` comes with the following functions:
 
-- Use [pgbulk.upsert][] to do a native Postgres `INSERT ON CONFLICT` statement.
-- Use [pgbulk.update][] to do a native Postgres bulk `UPDATE` statement.
-- Use [pgbulk.aupsert][] or [pgbulk.aupdate][] for async versions of these functions.
+- Use [pgbulk.upsert][] to do an `INSERT ON CONFLICT` statement.
+- Use [pgbulk.update][] to do a bulk `UPDATE` statement.
+- Use [pgbulk.copy][] to do a `COPY FROM` statement.
+- Use [pgbulk.aupsert][], [pgbulk.aupdate][], or [pgbulk.acopy][] for async versions.
 
 Below we show examples and advanced functionality.
 
 ## Using `pgbulk.upsert`
+
+[pgbulk.upsert][] allows for updating or inserting rows atomically and returning results based on inserts or updates. Update fields, returned values, and ignoring unchanged rows can be configured.
+
+See [the Postgres INSERT docs](https://www.postgresql.org/docs/current/sql-insert.html) for more information on how `ON CONFLICT` works.
 
 #### A basic bulk upsert on a model
 
@@ -56,7 +61,7 @@ print(results.updated)
 
 #### Use an expression for updates
 
-In the example, we increment `some_int_field` by one whenever an update happens. Otherwise it defaults to zero:
+In this example, we increment `some_int_field` by one whenever an update happens. Otherwise it defaults to zero:
 
 ```python
 pgbulk.upsert(
@@ -76,7 +81,7 @@ pgbulk.upsert(
 )
 ```
 
-#### Ignore updating unchanged rows
+#### Ignore updates to unchanged rows
 
 ```python
 pgbulk.upsert(
@@ -96,6 +101,8 @@ pgbulk.upsert(
     Triggers and auto-generated fields not in the update won't be applied. Unchanged rows also won't be returned if using `returning=True`.
 
 ## Using `pgbulk.update`
+
+[pgbulk.update][] issues updates to multiple rows with an `UPDATE SET ... FROM VALUES` statement. Update fields, returned values, and ignoring unchanged rows can be configured.
 
 #### Update an attribute of multiple models in bulk
 
@@ -154,7 +161,7 @@ results = pgbulk.upsert(
 print(results[0].int_field)
 ```
 
-#### Ignore updating unchanged rows
+#### Ignore updates to unchanged rows
 
 ```python
 pgbulk.upsert(
@@ -171,3 +178,53 @@ pgbulk.upsert(
 !!! warning
 
     Triggers and auto-generated fields not in the update won't be applied. Unchanged rows also won't be returned if using `returning=True`.
+
+## Using `pgbulk.copy`
+
+Using `pgbulk.copy` issues a `COPY ... FROM STDIN` statement to insert rows, which can be substantially faster than bulk `INSERT` statement or Django's `bulk_create`. Unlike `bulk_create`, `pgbulk.copy` cannot return inserted results.
+
+!!! note
+
+    `pgbulk.copy` is not only available when using psycopg2.
+
+#### Inserting Rows
+
+```python
+import pgbulk
+
+pgbulk.copy(
+    models.TestModel,
+    [
+        models.TestModel(int_field=5, float_field=1),
+        models.TestModel(int_field=6, float_field=2),
+        models.TestModel(int_field=7, float_field=3),
+    ],
+)
+```
+
+#### Inserting Specific Columns
+
+Specify columns or use `exclude` to configure which columns are copied:
+
+```python
+pgbulk.copy(
+    models.TestModel,
+    [
+        models.TestModel(int_field=5, float_field=1),
+        models.TestModel(int_field=6, float_field=2),
+        models.TestModel(int_field=7, float_field=3),
+    ],
+    ["int_field"]  # Only copy the int_field
+)
+```
+
+```python
+pgbulk.copy(
+    ...,
+    exclude=["generated_field"]  # Exclude only this field
+)
+```
+
+!!! note
+
+    Columns that are excluded from the copy must be generated, nullable, or have database defaults.

@@ -1,62 +1,89 @@
 # django-pgbulk
 
-`django-pgbulk` provides functions for doing native Postgres bulk upserts (i.e. [UPDATE ON CONFLICT](https://www.postgresql.org/docs/current/sql-insert.html)) and bulk updates.
+`django-pgbulk` provides functions for doing native Postgres bulk upserts (i.e. [UPDATE ON CONFLICT](https://www.postgresql.org/docs/current/sql-insert.html)), bulk updates, and [COPY FROM](https://www.postgresql.org/docs/current/sql-copy.html).
 
-Bulk upserts can distinguish between updated and created rows and optionally ignore redundant updates.
+Bulk upserts can distinguish between updated/created rows and ignore unchanged updates.
 
 Bulk updates are true bulk updates, unlike Django's [bulk_update](https://docs.djangoproject.com/en/4.2/ref/models/querysets/#bulk-update) which can still suffer from *O(N)* queries and can create poor locking scenarios.
 
+Bulk copies can significantly speed-up bulk inserts, sometimes by an order of magnitude over Django's `bulk_create`.
+
 ## Quick Start
 
-Do a bulk upsert on a model:
+### Examples
 
-    import pgbulk
+#### Update or insert rows
 
-    pgbulk.upsert(
-        MyModel,
-        [
-            MyModel(int_field=1, some_attr="some_val1"),
-            MyModel(int_field=2, some_attr="some_val2"),
-        ],
-        # These are the fields that identify the uniqueness constraint.
-        ["int_field"],
-        # These are the fields that will be updated if the row already
-        # exists. If not provided, all fields will be updated
-        ["some_attr"]
-    )
+```python
+import pgbulk
 
-Do a bulk update on a model:
+pgbulk.upsert(
+    MyModel,
+    [
+        MyModel(int_field=1, some_attr="some_val1"),
+        MyModel(int_field=2, some_attr="some_val2"),
+    ],
+    # These are the fields that identify the uniqueness constraint.
+    ["int_field"],
+    # These are the fields that will be updated if the row already
+    # exists. If not provided, all fields will be updated
+    ["some_attr"]
+)
+```
 
-    import pgbulk
+#### Bulk update rows
 
-    pgbulk.update(
-        MyModel,
-        [
-            MyModel(id=1, some_attr='some_val1'),
-            MyModel(id=2, some_attr='some_val2')
-        ],
-        # These are the fields that will be updated. If not provided,
-        # all fields will be updated
-        ['some_attr']
-    )
+```python
+import pgbulk
 
-[View the django-pgbulk docs](https://django-pgbulk.readthedocs.io/) for more information.
+pgbulk.update(
+    MyModel,
+    [
+        MyModel(id=1, some_attr='some_val1'),
+        MyModel(id=2, some_attr='some_val2')
+    ],
+    # These are the fields that will be updated. If not provided,
+    # all fields will be updated
+    ['some_attr']
+)
+```
+
+#### Copy rows into a table
+
+```python
+import pgbulk
+
+pgbulk.copy(
+    MyModel,
+    # Insert these rows using COPY FROM
+    [
+        MyModel(id=1, some_attr='some_val1'),
+        MyModel(id=2, some_attr='some_val2')
+    ],
+)
+```
+
+### Advanced Features
+
+Here are some advanced features at a glance:
+
+- `pgbulk.upsert` can categorize which rows were inserted or updated.
+- `pgbulk.upsert` and `pgbulk.update` can ignore updating unchanged fields.
+- `pgbulk.upsert` and `pgbulk.update` can use expressions in updates.
+
+## Documentation
+
+[View the django-pgbulk docs here](https://django-pgbulk.readthedocs.io/) for more examples.
 
 ## Compatibility
 
 `django-pgbulk` is compatible with Python 3.8 - 3.12, Django 4.2 - 5.1, Psycopg 2 - 3, and Postgres 13 - 16.
-
-## Documentation
-
-[View the django-pgbulk docs here](https://django-pgbulk.readthedocs.io/)
 
 ## Installation
 
 Install `django-pgbulk` with:
 
     pip3 install django-pgbulk
-
-After this, add `pgbulk` to the `INSTALLED_APPS` setting of your Django project.
 
 ## Contributing Guide
 

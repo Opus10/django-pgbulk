@@ -8,6 +8,7 @@ from django.db.models import F
 from pytz import timezone
 
 import pgbulk
+from pgbulk.core import psycopg_maj_version
 from pgbulk.tests import models
 
 
@@ -1227,3 +1228,78 @@ def test_aupdate():
     t_model.int_field = 1000
     async_to_sync(_run_aupdate)(t_model)
     assert models.TestModel.objects.get().int_field == 1000
+
+
+@pytest.mark.skipif(psycopg_maj_version == 2, reason="Only run on psycopg3")
+@pytest.mark.django_db(transaction=True)
+def test_copy():
+    """
+    Tests copying data into a table
+    """
+    pgbulk.copy(
+        models.TestModel,
+        [
+            models.TestModel(int_field=1),
+            models.TestModel(int_field=3),
+            models.TestModel(int_field=4),
+        ],
+    )
+
+    assert models.TestModel.objects.count() == 3
+    assert set(models.TestModel.objects.values_list("int_field", flat=True)) == {1, 3, 4}
+
+
+@pytest.mark.skipif(psycopg_maj_version == 2, reason="Only run on psycopg3")
+@pytest.mark.django_db(transaction=True)
+def test_copy_with_fields():
+    """
+    Tests copying data into a table with specific fields listed
+    """
+    pgbulk.copy(
+        models.TestModel,
+        [
+            models.TestModel(int_field=1),
+            models.TestModel(int_field=3),
+            models.TestModel(int_field=4),
+        ],
+        ["int_field", "json_field", "array_field", "time_zone"],
+    )
+
+    assert models.TestModel.objects.count() == 3
+    assert set(models.TestModel.objects.values_list("int_field", flat=True)) == {1, 3, 4}
+
+    pgbulk.copy(
+        models.TestModel,
+        [
+            models.TestModel(int_field=5, float_field=1),
+            models.TestModel(int_field=6, float_field=2),
+            models.TestModel(int_field=7, float_field=3),
+        ],
+        exclude=["float_field"],
+    )
+    assert models.TestModel.objects.count() == 6
+    assert set(models.TestModel.objects.values_list("int_field", flat=True)) == {1, 3, 4, 5, 6, 7}
+    assert set(models.TestModel.objects.values_list("float_field", flat=True)) == {None}
+
+
+@pytest.mark.skipif(psycopg_maj_version == 2, reason="Only run on psycopg3")
+@pytest.mark.django_db
+def test_acopy():
+    """
+    Basic test for async copy
+    """
+
+    async def _run_acopy():
+        return await pgbulk.acopy(
+            models.TestModel,
+            [
+                models.TestModel(int_field=1),
+                models.TestModel(int_field=3),
+                models.TestModel(int_field=4),
+            ],
+        )
+
+    async_to_sync(_run_acopy)()
+
+    assert models.TestModel.objects.count() == 3
+    assert set(models.TestModel.objects.values_list("int_field", flat=True)) == {1, 3, 4}

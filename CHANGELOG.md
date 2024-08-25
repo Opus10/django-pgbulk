@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.0.0
+
+#### Breaking Changes
+
+  - The `redundant_updates` flag for `pgbulk.upsert` was renamed to `ignore_unchanged`, and the default behavior was flipped by [@wesleykendall](https://github.com/wesleykendall) in [#38](https://github.com/Opus10/django-pgbulk/pull/38).
+
+    Unlike before, unchanged rows are *not* ignored by default. See [the pull request](https://github.com/Opus10/django-pgbulk/pull/38) for a guide on how to update invocations from version 2.
+
+#### Features
+
+  - Support update expressions, `returning`, and `ignore_unchanged` in `pgbulk.update` by [@wesleykendall](https://github.com/wesleykendall) in [#38](https://github.com/Opus10/django-pgbulk/pull/38)
+
+    `pgbulk.update`'s interface has reached feature parity with `pgbulk.upsert`, allowing for returning results, ignoring unchanged rows from being updated, and bulk updates with expressions.
+
+  - New `pgbulk.copy` function that leverages `COPY ... FROM` by [@wesleykendall](https://github.com/wesleykendall) in [#39](https://github.com/Opus10/django-pgbulk/pull/39)
+
+    `pgbulk.copy` wraps Postgres's `COPY ... FROM` to insert data. Can be dramatically faster than Django's `bulk_create`.
+
+#### Changes
+
+  - Django 5.1 compatibilty, dropped Django 3.2 / Postgres 12 support by [@wesleykendall](https://github.com/wesleykendall) in [#37](https://github.com/Opus10/django-pgbulk/pull/37).
+
 ## 2.5.0 (2024-08-09)
 
 #### Feature

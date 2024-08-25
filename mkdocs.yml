@@ -82,5 +82,6 @@ nav:
   - Overview: index.md
   - Installation: installation.md
   - User Guide: guide.md
+  - Reference: reference.md
   - Release Notes: release_notes.md
   - Contributing Guide: contributing.md

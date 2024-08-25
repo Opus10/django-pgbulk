@@ -46,7 +46,7 @@ def test_func_field_upsert():
         [models.TestFuncFieldModel(my_key="a", int_val=0)],
         ["my_key"],
         [pgbulk.UpdateField("int_val", expression=F("int_val") - 3)],
-        redundant_updates=False,
+        ignore_unchanged=True,
         returning=True,
     )
     assert models.TestFuncFieldModel.objects.count() == 1
@@ -58,7 +58,7 @@ def test_func_field_upsert():
         [models.TestFuncFieldModel(my_key="a", int_val=-2)],
         ["my_key"],
         [pgbulk.UpdateField("int_val")],
-        redundant_updates=False,
+        ignore_unchanged=True,
         returning=True,
     )
     assert models.TestFuncFieldModel.objects.count() == 1
@@ -419,7 +419,7 @@ def test_upsert_update_duplicate_fields_returning_none_updated():
         ["int_field"],
         ["char_field", "float_field"],
         returning=True,
-        redundant_updates=False,
+        ignore_unchanged=True,
     )
 
     assert list(results) == []
@@ -449,7 +449,7 @@ def test_upsert_update_duplicate_fields_returning_some_updated():
         ["int_field"],
         ["char_field", "float_field"],
         returning=["char_field"],
-        redundant_updates=False,
+        ignore_unchanged=True,
     )
 
     assert len(results.updated) == 1
@@ -482,7 +482,6 @@ def test_upsert_update_duplicate_fields_returning_some_updated_ignore_dups():
         ["int_field"],
         ["char_field", "float_field"],
         returning=["char_field"],
-        redundant_updates=True,
     )
 
     assert len(results.updated) == 3
@@ -887,6 +886,67 @@ def test_update_no_fields_given():
     assert test_obj_1.float_field == 8
     assert test_obj_2.int_field == 9
     assert test_obj_2.float_field == 10
+
+
+@pytest.mark.django_db
+def test_update_returning_ignore_unchanged():
+    """
+    Tests updating with returning and with ignore_unchanged=True
+    """
+    test_obj_1 = ddf.G(models.TestModel, int_field=1, float_field=2)
+    test_obj_2 = ddf.G(models.TestModel, int_field=2, float_field=3)
+    test_obj_1.int_field = 7
+    test_obj_1.float_field = 8
+    test_obj_2.int_field = 9
+    test_obj_2.float_field = 10
+
+    results = pgbulk.update(models.TestModel, [test_obj_2, test_obj_1], returning=True)
+    assert len(results) == 2
+    results = sorted(results, key=lambda r: r.id)
+    assert results[0].int_field == 7
+    assert results[0].float_field == 8
+    assert results[1].int_field == 9
+    assert results[1].float_field == 10
+
+    test_obj_1.refresh_from_db()
+    test_obj_2.refresh_from_db()
+    assert not pgbulk.update(
+        models.TestModel, [test_obj_2, test_obj_1], ignore_unchanged=True, returning=True
+    )
+
+    test_obj_1.int_field = 1
+    test_obj_1.float_field = 2
+    test_obj_2.int_field = 3
+    test_obj_2.float_field = 4
+    results = pgbulk.update(models.TestModel, [test_obj_2, test_obj_1], returning=["int_field"])
+    assert len(results) == 2
+    assert not hasattr(results[0], "float_field")
+    assert results[0].int_field == 1
+
+
+@pytest.mark.django_db
+def test_update_expressions():
+    """
+    Tests updating with expressions
+    """
+    test_obj_1 = ddf.G(models.TestModel, int_field=1, float_field=2)
+    test_obj_2 = ddf.G(models.TestModel, int_field=3, float_field=5)
+
+    pgbulk.update(
+        models.TestModel,
+        [test_obj_1, test_obj_2],
+        [
+            pgbulk.UpdateField("int_field", expression=F("int_field") + 1),
+            pgbulk.UpdateField("float_field", expression=F("float_field") + 2),
+        ],
+    )
+
+    test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
+    test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
+    assert test_obj_1.int_field == 2
+    assert test_obj_1.float_field == 4
+    assert test_obj_2.int_field == 4
+    assert test_obj_2.float_field == 7
 
 
 @pytest.mark.django_db

@@ -148,33 +148,42 @@ def _quote(field: str, cursor: "CursorWrapper") -> str:
         )
 
 
-def _get_update_fields(
-    queryset: models.QuerySet[models.Model],
-    to_update: UpdateFieldsTypeDef,
+def _filter_fields(
+    queryset: models.QuerySet[_M],
+    fields: UpdateFieldsTypeDef,
     exclude: Union[List[str], None] = None,
+    exclude_non_updatable: bool = True,
 ) -> List[Union[str, UpdateField]]:
     """
-    Get the fields to be updated in an upsert.
+    Filter fields.
 
-    Always exclude auto_now_add, primary key, generated, and non-concrete fields.
+    Always exclude non-concrete fields and auto fields.
+    Optionally exclude auto_now_add and primary keys.
     """
     exclude = exclude or []
     model = queryset.model
-    fields = {
-        **{field.attname: field for field in _model_fields(model)},
-        **{field.name: field for field in _model_fields(model)},
+    model_fields = _model_fields(model)
+    all_fields = {
+        **{field.attname: field for field in model_fields},
+        **{field.name: field for field in model_fields},
     }
 
-    if to_update is None:
-        to_update = [field.attname for field in _model_fields(model)]
+    if fields is None:
+        fields = [field.attname for field in model_fields]
 
     to_update = [
         attname
-        for attname in to_update
+        for attname in fields
         if (
             attname not in exclude
-            and not getattr(fields[attname], "auto_now_add", False)
-            and not fields[attname].primary_key
+            and not isinstance(all_fields[attname], models.AutoField)
+            and (
+                not exclude_non_updatable
+                or (
+                    not getattr(all_fields[attname], "auto_now_add", False)
+                    and not all_fields[attname].primary_key
+                )
+            )
         )
     ]
 
@@ -383,7 +392,7 @@ def _get_upsert_sql(
     ON CONFLICT (unique_field) DO UPDATE SET field2 = EXCLUDED.field2;
     """
     model = queryset.model
-    # Use all fields except pk unless the uniqueness constraint is the pk field
+    # Use all fields except auto fields unless in the uniqueness constraint
     all_fields = [
         field
         for field in _model_fields(model)
@@ -453,7 +462,7 @@ def _upsert(
 
     # Sort the rows to reduce the chances of deadlock during concurrent upserts
     model_objs = _sort_by_unique_fields(queryset, model_objs, unique_fields)
-    update_fields = _get_update_fields(queryset, update_fields, exclude=[*exclude, *unique_fields])  # type: ignore
+    update_fields = _filter_fields(queryset, update_fields, exclude=[*exclude, *unique_fields])  # type: ignore
 
     upserted: List["Row"] = []
 
@@ -493,7 +502,7 @@ def _update(
     model = queryset.model
     connection = connections[queryset.db]
     alias = "new_values"
-    update_fields = _get_update_fields(queryset, update_fields, exclude)  # type: ignore
+    update_fields = _filter_fields(queryset, update_fields, exclude)  # type: ignore
     update_db_cols = [model._meta.get_field(update_field).column for update_field in update_fields]
 
     # Sort the model objects to reduce the likelihood of deadlocks
@@ -602,10 +611,10 @@ def update(
     Performs a bulk update.
 
     Args:
-        queryset: The queryset to use when bulk updating
-        model_objs: Model object values to use for the update
-        update_fields: A list of fields on the
-            model objects to update. If `None`, all fields will be updated.
+        queryset: A model or a queryset for the table being updated.
+        model_objs: Model object values to use for the update.
+        update_fields: A list of fields on the model objects to update.
+            If `None`, all fields will be updated.
         exclude: A list of fields to exclude from the update. This is useful
             when `update_fields` is `None` and you want to exclude fields from
             being updated.
@@ -675,13 +684,12 @@ def upsert(
     Perform a bulk upsert.
 
     Args:
-        queryset: A model or a queryset that defines the
-            collection to upsert
+        queryset: A model or a queryset for the table being upserted.
         model_objs: An iterable of Django models to upsert. All models
             in this list will be bulk upserted.
         unique_fields: A list of fields that define the uniqueness
             of the model. The model must have a unique constraint on these
-            fields
+            fields.
         update_fields: A list of fields to update whenever objects already exist.
             If an empty list is provided, it is equivalent to doing a bulk insert on
             the objects that don't exist. If `None`, all fields will be updated.
@@ -744,4 +752,80 @@ async def aupsert(
         returning=returning,
         exclude=exclude,
         ignore_unchanged=ignore_unchanged,
+    )
+
+
+def copy(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    copy_fields: UpdateFieldsTypeDef = None,
+    *,
+    exclude: Union[List[str], None] = None,
+) -> None:
+    """
+    Copy data into a table.
+
+    Args:
+        queryset: queryset: A model or a queryset for the table being copied into.
+        model_objs: An iterable of Django models to copy.
+        copy_fields: A list of fields on the model objects to copy.
+            If `None`, all fields will be copied.
+        exclude: A list of fields to exclude from the copy. This is useful
+            when `update_fields` is `None` and you want to exclude fields from
+            being copied.
+
+    Note:
+        Model signals such as `post_save` are not emitted.
+    """
+    if psycopg_maj_version == 2:
+        raise RuntimeError("Only psycopg3 is supported for pgbulk.copy.")
+
+    queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
+    model = queryset.model
+
+    # Populate automatically-generated fields in the rows like date times
+    _fill_auto_fields(queryset, model_objs)
+
+    # Determine which fields should be copied
+    fields = [
+        model._meta.get_field(field)
+        for field in _filter_fields(
+            queryset, copy_fields, exclude=exclude, exclude_non_updatable=False
+        )
+    ]
+    cols = [field.column for field in fields]
+
+    with connections[queryset.db].cursor() as cursor:
+        all_field_names_sql = ", ".join([_quote(col, cursor) for col in cols])
+        copy_sql = (
+            f"COPY {_quote(model._meta.db_table, cursor)} ({all_field_names_sql}) FROM STDIN"
+        )
+        with cursor.copy(copy_sql) as copier:  # type: ignore
+            for model_obj in model_objs:
+                row = _get_values_for_row(queryset, model_obj, fields)
+                copier.write_row(row)  # type: ignore
+
+
+async def acopy(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    copy_fields: UpdateFieldsTypeDef = None,
+    *,
+    exclude: Union[List[str], None] = None,
+) -> None:
+    """
+    Asynchronously copy data into a table.
+
+    See [pgbulk.copy][]
+
+    Note:
+        Like other async Django ORM methods, `acopy` currently wraps `copy` in
+        a `sync_to_async` wrapper. It does not yet use an asynchronous database
+        driver but will in the future.
+    """
+    return await sync_to_async(copy)(
+        queryset,
+        model_objs,
+        copy_fields=copy_fields,
+        exclude=exclude,
     )

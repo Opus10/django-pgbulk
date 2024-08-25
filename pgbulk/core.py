@@ -2,6 +2,7 @@ import itertools
 from typing import (
     TYPE_CHECKING,
     Any,
+    Dict,
     Iterable,
     List,
     Literal,
@@ -316,6 +317,32 @@ def _ignore_identical_sql(
     )
 
 
+def _get_update_fields_expressions(
+    queryset: models.QuerySet[_M], fields: List[Union[str, UpdateField]], cursor: "CursorWrapper"
+) -> Dict[str, str]:
+    """Render expressions for every update field."""
+    connection = connections[queryset.db]
+    model = queryset.model
+    cols = [model._meta.get_field(update_field).column for update_field in fields]
+    update_expressions = {
+        f: f.expression for f in fields if isinstance(f, UpdateField) and f.expression
+    }
+    update_fields_expressions = {col: f"EXCLUDED.{_quote(col, cursor)}" for col in cols}
+    if update_expressions:
+        connection = connections[queryset.db]
+        compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)  # type: ignore
+        with connection.cursor() as cursor:
+            for field_name, expr in update_expressions.items():
+                expr = expr.resolve_expression(queryset.query, allow_joins=False, for_save=True)
+                val = cursor.mogrify(*expr.as_sql(compiler, connection))  #  type: ignore
+                val = cast(Union[str, bytes], val)
+                if isinstance(val, bytes):  # Psycopg 2/3 return different types
+                    val = val.decode("utf-8")
+                update_fields_expressions[model._meta.get_field(field_name).column] = val
+
+    return update_fields_expressions
+
+
 def _get_upsert_sql(
     queryset: models.QuerySet[_M],
     model_objs: Iterable[_M],
@@ -332,10 +359,6 @@ def _get_upsert_sql(
     ON CONFLICT (unique_field) DO UPDATE SET field2 = EXCLUDED.field2;
     """
     model = queryset.model
-    update_expressions = {
-        f: f.expression for f in update_fields if isinstance(f, UpdateField) and f.expression
-    }
-
     # Use all fields except pk unless the uniqueness constraint is the pk field
     all_fields = [
         field
@@ -354,19 +377,9 @@ def _get_upsert_sql(
     row_values, sql_args = _get_values_for_rows(queryset, model_objs, all_fields)
 
     unique_field_names_sql = ", ".join([_quote(col, cursor) for col in unique_db_cols])
-    update_fields_expressions = {col: f"EXCLUDED.{_quote(col, cursor)}" for col in update_db_cols}
-    if update_expressions:
-        connection = connections[queryset.db]
-        compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)  # type: ignore
-        with connection.cursor() as cursor:
-            for field_name, expr in update_expressions.items():
-                expr = expr.resolve_expression(queryset.query, allow_joins=False, for_save=True)
-                val = cursor.mogrify(*expr.as_sql(compiler, connection))  #  type: ignore
-                val = cast(Union[str, bytes], val)
-                if isinstance(val, bytes):  # Psycopg 2/3 return different types
-                    val = val.decode("utf-8")
-                update_fields_expressions[model._meta.get_field(field_name).column] = val
-
+    update_fields_expressions = _get_update_fields_expressions(
+        queryset=queryset, fields=update_fields, cursor=cursor
+    )
     update_fields_sql = ", ".join(
         f"{_quote(col, cursor)} = {update_fields_expressions[col]}" for col in update_db_cols
     )

@@ -75,7 +75,7 @@ footing = "*"
 setuptools = "*"
 poetry-core = "*"
 typing-extensions = "4.12.2"
-django-stubs = "5.0.4"
+django-types = "0.19.1"
 dj-database-url = "2.2.0"
 psycopg2-binary = "2.9.9"
 

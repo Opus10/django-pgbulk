@@ -54,7 +54,7 @@ print(results.created)
 print(results.updated)
 ```
 
-#### Use an expression for updates.
+#### Use an expression for updates
 
 In the example, we increment `some_int_field` by one whenever an update happens. Otherwise it defaults to zero:
 

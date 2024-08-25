@@ -141,7 +141,11 @@ def _quote(field: str, cursor: "CursorWrapper") -> str:
     if psycopg_maj_version == 2:
         return quote_ident(field, cursor.cursor)  # type: ignore
     else:
-        return Escaping.escape_identifier(field)  # type: ignore
+        return (
+            Escaping(cursor.connection.pgconn)  # type: ignore
+            .escape_identifier(data=field.encode("utf-8"))
+            .decode()
+        )
 
 
 def _get_update_fields(

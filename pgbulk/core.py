@@ -295,7 +295,10 @@ def _get_values_for_rows(
 
 
 def _get_returning_sql(
-    returning: List[str], model: Type[models.Model], cursor: "CursorWrapper", include_status: bool
+    returning: Union[List[str], bool],
+    model: Type[models.Model],
+    cursor: "CursorWrapper",
+    include_status: bool,
 ) -> str:
     returning = returning if returning is not True else [f.column for f in _model_fields(model)]
     if not returning:

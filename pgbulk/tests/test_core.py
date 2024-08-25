@@ -917,7 +917,7 @@ def test_update_expressions():
     Tests updating with expressions
     """
     test_obj_1 = ddf.G(models.TestModel, int_field=1, float_field=2)
-    test_obj_2 = ddf.G(models.TestModel, int_field=2, float_field=3)
+    test_obj_2 = ddf.G(models.TestModel, int_field=3, float_field=5)
 
     pgbulk.update(
         models.TestModel,
@@ -932,8 +932,8 @@ def test_update_expressions():
     test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
     assert test_obj_1.int_field == 2
     assert test_obj_1.float_field == 4
-    assert test_obj_2.int_field == 3
-    assert test_obj_2.float_field == 5
+    assert test_obj_2.int_field == 4
+    assert test_obj_2.float_field == 7
 
 
 @pytest.mark.django_db

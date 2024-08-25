@@ -2,7 +2,6 @@ import itertools
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Iterable,
     List,
     Literal,
@@ -317,17 +316,21 @@ def _ignore_identical_sql(
     )
 
 
-def _get_update_fields_expressions(
-    queryset: models.QuerySet[_M], fields: List[Union[str, UpdateField]], cursor: "CursorWrapper"
-) -> Dict[str, str]:
-    """Render expressions for every update field."""
+def _get_update_fields_sql(
+    queryset: models.QuerySet[_M],
+    fields: List[Union[str, UpdateField]],
+    alias: str,
+    ignore_identical: bool,
+    cursor: "CursorWrapper",
+) -> Tuple[str, str]:
+    """Render SET clause of update for every update field."""
     connection = connections[queryset.db]
     model = queryset.model
     cols = [model._meta.get_field(update_field).column for update_field in fields]
     update_expressions = {
         f: f.expression for f in fields if isinstance(f, UpdateField) and f.expression
     }
-    update_fields_expressions = {col: f"EXCLUDED.{_quote(col, cursor)}" for col in cols}
+    update_fields_expressions = {col: f"{alias}.{_quote(col, cursor)}" for col in cols}
     if update_expressions:
         connection = connections[queryset.db]
         compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)  # type: ignore
@@ -340,7 +343,20 @@ def _get_update_fields_expressions(
                     val = val.decode("utf-8")
                 update_fields_expressions[model._meta.get_field(field_name).column] = val
 
-    return update_fields_expressions
+    set_sql = ", ".join(
+        f"{_quote(col, cursor)} = {update_fields_expressions[col]}" for col in cols
+    )
+    ignore_identical_sql = ""
+    if ignore_identical and cols:
+        ignore_identical_sql = ("(({fields_sql}) IS DISTINCT FROM ({expressions_sql}))").format(
+            fields_sql=", ".join(
+                "{0}.{1}".format(_quote(model._meta.db_table, cursor), _quote(col, cursor))
+                for col in cols
+            ),
+            expressions_sql=", ".join(update_fields_expressions.values()),
+        )
+
+    return set_sql, ignore_identical_sql
 
 
 def _get_upsert_sql(
@@ -377,23 +393,17 @@ def _get_upsert_sql(
     row_values, sql_args = _get_values_for_rows(queryset, model_objs, all_fields)
 
     unique_field_names_sql = ", ".join([_quote(col, cursor) for col in unique_db_cols])
-    update_fields_expressions = _get_update_fields_expressions(
-        queryset=queryset, fields=update_fields, cursor=cursor
+    update_fields_sql, ignore_identical_sql = _get_update_fields_sql(
+        queryset=queryset,
+        fields=update_fields,
+        alias="EXCLUDED",
+        ignore_identical=ignore_identical,
+        cursor=cursor,
     )
-    update_fields_sql = ", ".join(
-        f"{_quote(col, cursor)} = {update_fields_expressions[col]}" for col in update_db_cols
-    )
+    if ignore_identical_sql:
+        ignore_identical_sql = f"WHERE {ignore_identical_sql}"
 
     return_sql = "RETURNING " + _get_return_fields_sql(returning, cursor) if returning else ""
-    ignore_identical_sql = ""
-    if ignore_identical and update_db_cols:
-        ignore_identical_sql = _ignore_identical_sql(
-            model,
-            cols=update_db_cols,
-            expressions=list(update_fields_expressions.values()),
-            cursor=cursor,
-        )
-        ignore_identical_sql = f" WHERE {ignore_identical_sql} "
 
     on_conflict = (
         "DO UPDATE SET {0} {1}".format(update_fields_sql, ignore_identical_sql)
@@ -515,6 +525,13 @@ def _update(
         '{field} = "{alias}".{field}'.format(field=_quote(col, cursor), alias=alias)
         for col in update_db_cols
     )
+    update_fields_sql, ignore_identical_sql = _get_update_fields_sql(
+        queryset=queryset,
+        fields=update_fields,
+        alias=alias,
+        ignore_identical=ignore_identical,
+        cursor=cursor,
+    )
 
     values_sql = ", ".join(
         [
@@ -543,11 +560,7 @@ def _update(
         values_sql=values_sql,
         value_fields_sql=value_fields_sql,
     )
-    if ignore_identical:
-        expressions = [f"{alias}.{_quote(col, cursor)}" for col in update_db_cols]
-        ignore_identical_sql = _ignore_identical_sql(
-            model, cols=update_db_cols, expressions=expressions, cursor=cursor
-        )
+    if ignore_identical_sql:
         update_sql += f" AND {ignore_identical_sql}"
 
     update_sql_params = list(itertools.chain(*row_values))

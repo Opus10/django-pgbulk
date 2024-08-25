@@ -137,6 +137,7 @@ class UpsertResult(List["Row"]):
 
 
 def _quote(field: str, cursor: "CursorWrapper") -> str:
+    """Quote identifiers."""
     if psycopg_maj_version == 2:
         return quote_ident(field, cursor.cursor)  # type: ignore
     else:
@@ -293,27 +294,24 @@ def _get_values_for_rows(
     return row_values, sql_args
 
 
-def _get_return_fields_sql(returning: List[str], cursor: "CursorWrapper") -> str:
-    return_fields_sql = ", ".join(_quote(field, cursor) for field in returning)
-    return_fields_sql += ", CASE WHEN xmax = 0 THEN 'c' ELSE 'u' END AS status_"
-    return return_fields_sql
+def _get_returning_sql(
+    returning: List[str], model: Type[models.Model], cursor: "CursorWrapper", include_status: bool
+) -> str:
+    returning = returning if returning is not True else [f.column for f in _model_fields(model)]
+    if not returning:
+        return ""
+
+    table = _quote(model._meta.db_table, cursor)
+    returning_sql = ", ".join(f"{table}.{_quote(field, cursor)}" for field in returning)
+    if include_status:
+        returning_sql += ", CASE WHEN xmax = 0 THEN 'c' ELSE 'u' END AS status_"
+
+    return "RETURNING " + returning_sql
 
 
 def _model_fields(model: Type[models.Model]) -> List["models.Field[Any, Any]"]:
     """Return the fields of a model, excluding generated and non-concrete ones."""
     return [f for f in model._meta.fields if not getattr(f, "generated", False) and f.concrete]
-
-
-def _ignore_identical_sql(
-    model: Type[models.Model], cols: List[str], expressions: List[str], cursor: "CursorWrapper"
-) -> str:
-    return ("(({fields_sql}) IS DISTINCT FROM ({expressions_sql}))").format(
-        fields_sql=", ".join(
-            "{0}.{1}".format(_quote(model._meta.db_table, cursor), _quote(col, cursor))
-            for col in cols
-        ),
-        expressions_sql=", ".join(expressions),
-    )
 
 
 def _get_update_fields_sql(
@@ -323,7 +321,10 @@ def _get_update_fields_sql(
     ignore_identical: bool,
     cursor: "CursorWrapper",
 ) -> Tuple[str, str]:
-    """Render SET clause of update for every update field."""
+    """Render the SET and WHERE clause of update for every update field.
+
+    If the WHERE clause is returned, it means we're ignoring identical updates.
+    """
     connection = connections[queryset.db]
     model = queryset.model
     cols = [model._meta.get_field(update_field).column for update_field in fields]
@@ -383,7 +384,6 @@ def _get_upsert_sql(
     ]
 
     all_field_names = [field.column for field in all_fields]
-    returning = returning if returning is not True else [f.column for f in _model_fields(model)]
     all_field_names_sql = ", ".join([_quote(field, cursor) for field in all_field_names])
 
     # Convert field names to db column names
@@ -403,7 +403,7 @@ def _get_upsert_sql(
     if ignore_identical_sql:
         ignore_identical_sql = f"WHERE {ignore_identical_sql}"
 
-    return_sql = "RETURNING " + _get_return_fields_sql(returning, cursor) if returning else ""
+    return_sql = _get_returning_sql(returning, model=model, cursor=cursor, include_status=True)
 
     on_conflict = (
         "DO UPDATE SET {0} {1}".format(update_fields_sql, ignore_identical_sql)
@@ -437,7 +437,7 @@ def _upsert(
     returning: Union[List[str], bool],
     ignore_identical: bool,
     cursor: "CursorWrapper",
-) -> UpsertResult:
+) -> UpsertResult | None:
     """Internal implementation of bulk upsert."""
     exclude = exclude or []
 
@@ -468,7 +468,7 @@ def _upsert(
             nt_result = NamedTuple("Result", result)
             upserted = cast(List["Row"], [nt_result(*row) for row in cursor.fetchall()])
 
-    return UpsertResult(upserted)
+    return UpsertResult(upserted) if returning else None
 
 
 def _update(
@@ -476,9 +476,10 @@ def _update(
     model_objs: Iterable[_M],
     update_fields: Union[List[str], None],
     exclude: Union[List[str], None],
+    returning: Union[List[str], bool],
     ignore_identical: bool,
     cursor: "CursorWrapper",
-) -> None:
+) -> List["Row"] | None:
     """
     Core update implementation
     """
@@ -522,7 +523,7 @@ def _update(
     )
 
     update_fields_sql = ", ".join(
-        '{field} = "{alias}".{field}'.format(field=_quote(col, cursor), alias=alias)
+        "{field} = {alias}.{field}".format(field=_quote(col, cursor), alias=alias)
         for col in update_db_cols
     )
     update_fields_sql, ignore_identical_sql = _get_update_fields_sql(
@@ -547,11 +548,15 @@ def _update(
         ]
     )
 
+    if ignore_identical_sql:
+        ignore_identical_sql = f"AND {ignore_identical_sql}"
+
     update_sql = (
         "UPDATE {table} "
         "SET {update_fields_sql} "
         "FROM (VALUES {values_sql}) AS {alias} ({value_fields_sql}) "
-        'WHERE {table}.{pk_field} = "new_values".{pk_field}'
+        "WHERE {table}.{pk_field} = new_values.{pk_field} {ignore_identical_sql} "
+        "{returning_sql}"
     ).format(
         table=_quote(model._meta.db_table, cursor),
         pk_field=_quote(model._meta.pk.column, cursor),
@@ -559,20 +564,31 @@ def _update(
         update_fields_sql=update_fields_sql,
         values_sql=values_sql,
         value_fields_sql=value_fields_sql,
+        ignore_identical_sql=ignore_identical_sql,
+        returning_sql=_get_returning_sql(
+            returning=returning, model=model, include_status=False, cursor=cursor
+        ),
     )
-    if ignore_identical_sql:
-        update_sql += f" AND {ignore_identical_sql}"
 
     update_sql_params = list(itertools.chain(*row_values))
     update_sql_params = _prep_sql_args(queryset, cursor=cursor, sql_args=update_sql_params)
     cursor.execute(update_sql, update_sql_params)
+    updated: List["Row"] = []
+    if cursor.description:
+        result = [(col.name, Any) for col in cursor.description]
+        nt_result = NamedTuple("Result", result)
+        updated = cast(List["Row"], [nt_result(*row) for row in cursor.fetchall()])
+
+    return updated if returning else None
 
 
 def update(
     queryset: QuerySet[_M],
     model_objs: Iterable[_M],
     update_fields: Union[List[str], None] = None,
+    *,
     exclude: Union[List[str], None] = None,
+    returning: Union[List[str], bool] = False,
     ignore_identical: bool = False,
 ) -> None:
     """
@@ -586,6 +602,8 @@ def update(
         exclude: A list of fields to exclude from the update. This is useful
             when `update_fields` is `None` and you want to exclude fields from
             being updated.
+        returning: If True, returns all fields. If a list, only returns fields
+            in the list. If False, do not return results from the upsert.
         ignore_identical: Ignore identical rows in updates.
 
     Note:
@@ -614,6 +632,7 @@ def update(
             model_objs=model_objs,
             update_fields=update_fields,
             exclude=exclude,
+            returning=returning,
             ignore_identical=ignore_identical,
             cursor=cursor,
         )
@@ -623,7 +642,9 @@ async def aupdate(
     queryset: QuerySet[_M],
     model_objs: Iterable[_M],
     update_fields: Union[List[str], None] = None,
+    *,
     exclude: Union[List[str], None] = None,
+    returning: Union[List[str], bool] = False,
     ignore_identical: bool = False,
 ) -> None:
     """
@@ -641,6 +662,7 @@ async def aupdate(
         model_objs,
         update_fields=update_fields,
         exclude=exclude,
+        returning=returning,
         ignore_identical=ignore_identical,
     )
 
@@ -782,8 +804,8 @@ async def aupsert(
     unique_fields: List[str],
     update_fields: UpdateFieldsTypeDef = None,
     *,
-    returning: Union[List[str], bool] = False,
     exclude: Union[List[str], None] = None,
+    returning: Union[List[str], bool] = False,
     ignore_identical: bool = False,
 ) -> UpsertResult:
     """

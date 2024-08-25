@@ -889,9 +889,9 @@ def test_update_no_fields_given():
 
 
 @pytest.mark.django_db
-def test_update_ignore_identical():
+def test_update_returning_ignore_identical():
     """
-    Tests updating when ignore_identical=True
+    Tests updating with returning and with ignore_identical=True
     """
     test_obj_1 = ddf.G(models.TestModel, int_field=1, float_field=2)
     test_obj_2 = ddf.G(models.TestModel, int_field=2, float_field=3)
@@ -900,15 +900,28 @@ def test_update_ignore_identical():
     test_obj_2.int_field = 9
     test_obj_2.float_field = 10
 
-    pgbulk.update(models.TestModel, [test_obj_2, test_obj_1], ignore_identical=True)
-    pgbulk.update(models.TestModel, [test_obj_2, test_obj_1], ignore_identical=True)
+    results = pgbulk.update(models.TestModel, [test_obj_2, test_obj_1], returning=True)
+    assert len(results) == 2
+    results = sorted(results, key=lambda r: r.id)
+    assert results[0].int_field == 7
+    assert results[0].float_field == 8
+    assert results[1].int_field == 9
+    assert results[1].float_field == 10
 
-    test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
-    test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
-    assert test_obj_1.int_field == 7
-    assert test_obj_1.float_field == 8
-    assert test_obj_2.int_field == 9
-    assert test_obj_2.float_field == 10
+    test_obj_1.refresh_from_db()
+    test_obj_2.refresh_from_db()
+    assert not pgbulk.update(
+        models.TestModel, [test_obj_2, test_obj_1], ignore_identical=True, returning=True
+    )
+
+    test_obj_1.int_field = 1
+    test_obj_1.float_field = 2
+    test_obj_2.int_field = 3
+    test_obj_2.float_field = 4
+    results = pgbulk.update(models.TestModel, [test_obj_2, test_obj_1], returning=["int_field"])
+    assert len(results) == 2
+    assert not hasattr(results[0], "float_field")
+    assert results[0].int_field == 1
 
 
 @pytest.mark.django_db

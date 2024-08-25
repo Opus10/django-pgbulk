@@ -326,7 +326,7 @@ def _get_update_fields_sql(
 ) -> Tuple[str, str]:
     """Render the SET and WHERE clause of update for every update field.
 
-    If the WHERE clause is returned, it means we're ignoring identical updates.
+    If the WHERE clause is returned, it means we're ignoring unchanged rows.
     """
     connection = connections[queryset.db]
     model = queryset.model
@@ -607,7 +607,7 @@ def update(
             being updated.
         returning: If True, returns all fields. If a list, only returns fields
             in the list. If False, do not return results from the upsert.
-        ignore_unchanged: Ignore identical rows in updates.
+        ignore_unchanged: Ignore unchanged rows in updates.
 
     Note:
         Model signals such as `post_save` are not emitted.
@@ -688,7 +688,7 @@ def upsert(
             being updated. This is additive to the `unique_fields` list.
         returning: If True, returns all fields. If a list, only returns fields
             in the list. If False, do not return results from the upsert.
-        ignore_unchanged: Ignore identical rows in updates.
+        ignore_unchanged: Ignore unchanged rows in updates.
 
     Returns:
         If `returning=True`, the upserted result, an iterable list of all upsert objects.

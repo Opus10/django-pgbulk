@@ -76,7 +76,7 @@ pgbulk.upsert(
 )
 ```
 
-#### Don't apply updates if the rows are identical
+#### Ignore updating unchanged rows
 
 ```python
 pgbulk.upsert(
@@ -93,7 +93,7 @@ pgbulk.upsert(
 
 !!! warning
 
-    Triggers and auto-generated fields not in the update won't be applied. Identical rows also won't be returned if using `returning=True`.
+    Triggers and auto-generated fields not in the update won't be applied. Unchanged rows also won't be returned if using `returning=True`.
 
 ## Using `pgbulk.update`
 
@@ -154,9 +154,7 @@ results = pgbulk.upsert(
 print(results[0].int_field)
 ```
 
-#### Don't apply updates if the rows are identical
-
-Use `ignore_unchanged=True` to avoid identical updates:
+#### Ignore updating unchanged rows
 
 ```python
 pgbulk.upsert(
@@ -172,4 +170,4 @@ pgbulk.upsert(
 
 !!! warning
 
-    Triggers and auto-generated fields not in the update won't be applied. Identical rows also won't be returned if using `returning=True`.
+    Triggers and auto-generated fields not in the update won't be applied. Unchanged rows also won't be returned if using `returning=True`.

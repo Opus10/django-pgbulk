@@ -321,7 +321,7 @@ def _get_update_fields_sql(
     queryset: models.QuerySet[_M],
     fields: List[Union[str, UpdateField]],
     alias: str,
-    ignore_identical: bool,
+    ignore_unchanged: bool,
     cursor: "CursorWrapper",
 ) -> Tuple[str, str]:
     """Render the SET and WHERE clause of update for every update field.
@@ -350,9 +350,9 @@ def _get_update_fields_sql(
     set_sql = ", ".join(
         f"{_quote(col, cursor)} = {update_fields_expressions[col]}" for col in cols
     )
-    ignore_identical_sql = ""
-    if ignore_identical and cols:
-        ignore_identical_sql = ("(({fields_sql}) IS DISTINCT FROM ({expressions_sql}))").format(
+    ignore_unchanged_sql = ""
+    if ignore_unchanged and cols:
+        ignore_unchanged_sql = ("(({fields_sql}) IS DISTINCT FROM ({expressions_sql}))").format(
             fields_sql=", ".join(
                 "{0}.{1}".format(_quote(model._meta.db_table, cursor), _quote(col, cursor))
                 for col in cols
@@ -360,7 +360,7 @@ def _get_update_fields_sql(
             expressions_sql=", ".join(update_fields_expressions.values()),
         )
 
-    return set_sql, ignore_identical_sql
+    return set_sql, ignore_unchanged_sql
 
 
 def _get_upsert_sql(
@@ -369,7 +369,7 @@ def _get_upsert_sql(
     unique_fields: List[str],
     update_fields: List[Union[str, UpdateField]],
     returning: Union[List[str], bool],
-    ignore_identical: bool,
+    ignore_unchanged: bool,
     cursor: "CursorWrapper",
 ) -> Tuple[str, List[Any]]:
     """
@@ -396,20 +396,20 @@ def _get_upsert_sql(
     row_values, sql_args = _get_values_for_rows(queryset, model_objs, all_fields)
 
     unique_field_names_sql = ", ".join([_quote(col, cursor) for col in unique_db_cols])
-    update_fields_sql, ignore_identical_sql = _get_update_fields_sql(
+    update_fields_sql, ignore_unchanged_sql = _get_update_fields_sql(
         queryset=queryset,
         fields=update_fields,
         alias="EXCLUDED",
-        ignore_identical=ignore_identical,
+        ignore_unchanged=ignore_unchanged,
         cursor=cursor,
     )
-    if ignore_identical_sql:
-        ignore_identical_sql = f"WHERE {ignore_identical_sql}"
+    if ignore_unchanged_sql:
+        ignore_unchanged_sql = f"WHERE {ignore_unchanged_sql}"
 
     return_sql = _get_returning_sql(returning, model=model, cursor=cursor, include_status=True)
 
     on_conflict = (
-        "DO UPDATE SET {0} {1}".format(update_fields_sql, ignore_identical_sql)
+        "DO UPDATE SET {0} {1}".format(update_fields_sql, ignore_unchanged_sql)
         if update_db_cols
         else "DO NOTHING"
     )
@@ -438,7 +438,7 @@ def _upsert(
     update_fields: UpdateFieldsTypeDef,
     exclude: Union[List[str], None],
     returning: Union[List[str], bool],
-    ignore_identical: bool,
+    ignore_unchanged: bool,
     cursor: "CursorWrapper",
 ) -> Union[UpsertResult, None]:
     """Internal implementation of bulk upsert."""
@@ -460,7 +460,7 @@ def _upsert(
             unique_fields=unique_fields,
             update_fields=update_fields,
             returning=returning,
-            ignore_identical=ignore_identical,
+            ignore_unchanged=ignore_unchanged,
             cursor=cursor,
         )
 
@@ -480,7 +480,7 @@ def _update(
     update_fields: Union[List[str], None],
     exclude: Union[List[str], None],
     returning: Union[List[str], bool],
-    ignore_identical: bool,
+    ignore_unchanged: bool,
     cursor: "CursorWrapper",
 ) -> Union[List["Row"], None]:
     """
@@ -529,11 +529,11 @@ def _update(
         "{field} = {alias}.{field}".format(field=_quote(col, cursor), alias=alias)
         for col in update_db_cols
     )
-    update_fields_sql, ignore_identical_sql = _get_update_fields_sql(
+    update_fields_sql, ignore_unchanged_sql = _get_update_fields_sql(
         queryset=queryset,
         fields=update_fields,
         alias=alias,
-        ignore_identical=ignore_identical,
+        ignore_unchanged=ignore_unchanged,
         cursor=cursor,
     )
 
@@ -551,14 +551,14 @@ def _update(
         ]
     )
 
-    if ignore_identical_sql:
-        ignore_identical_sql = f"AND {ignore_identical_sql}"
+    if ignore_unchanged_sql:
+        ignore_unchanged_sql = f"AND {ignore_unchanged_sql}"
 
     update_sql = (
         "UPDATE {table} "
         "SET {update_fields_sql} "
         "FROM (VALUES {values_sql}) AS {alias} ({value_fields_sql}) "
-        "WHERE {table}.{pk_field} = new_values.{pk_field} {ignore_identical_sql} "
+        "WHERE {table}.{pk_field} = new_values.{pk_field} {ignore_unchanged_sql} "
         "{returning_sql}"
     ).format(
         table=_quote(model._meta.db_table, cursor),
@@ -567,7 +567,7 @@ def _update(
         update_fields_sql=update_fields_sql,
         values_sql=values_sql,
         value_fields_sql=value_fields_sql,
-        ignore_identical_sql=ignore_identical_sql,
+        ignore_unchanged_sql=ignore_unchanged_sql,
         returning_sql=_get_returning_sql(
             returning=returning, model=model, include_status=False, cursor=cursor
         ),
@@ -592,7 +592,7 @@ def update(
     *,
     exclude: Union[List[str], None] = None,
     returning: Union[List[str], bool] = False,
-    ignore_identical: bool = False,
+    ignore_unchanged: bool = False,
 ) -> Union[List["Row"], None]:
     """
     Performs a bulk update.
@@ -607,7 +607,7 @@ def update(
             being updated.
         returning: If True, returns all fields. If a list, only returns fields
             in the list. If False, do not return results from the upsert.
-        ignore_identical: Ignore identical rows in updates.
+        ignore_unchanged: Ignore identical rows in updates.
 
     Note:
         Model signals such as `post_save` are not emitted.
@@ -623,7 +623,7 @@ def update(
             update_fields=update_fields,
             exclude=exclude,
             returning=returning,
-            ignore_identical=ignore_identical,
+            ignore_unchanged=ignore_unchanged,
             cursor=cursor,
         )
 
@@ -635,7 +635,7 @@ async def aupdate(
     *,
     exclude: Union[List[str], None] = None,
     returning: Union[List[str], bool] = False,
-    ignore_identical: bool = False,
+    ignore_unchanged: bool = False,
 ) -> Union[List["Row"], None]:
     """
     Perform an asynchronous bulk update.
@@ -653,7 +653,7 @@ async def aupdate(
         update_fields=update_fields,
         exclude=exclude,
         returning=returning,
-        ignore_identical=ignore_identical,
+        ignore_unchanged=ignore_unchanged,
     )
 
 
@@ -665,7 +665,7 @@ def upsert(
     *,
     exclude: Union[List[str], None] = None,
     returning: Union[List[str], bool] = False,
-    ignore_identical: bool = False,
+    ignore_unchanged: bool = False,
 ) -> Union[UpsertResult, None]:
     """
     Perform a bulk upsert.
@@ -688,7 +688,7 @@ def upsert(
             being updated. This is additive to the `unique_fields` list.
         returning: If True, returns all fields. If a list, only returns fields
             in the list. If False, do not return results from the upsert.
-        ignore_identical: Ignore identical rows in updates.
+        ignore_unchanged: Ignore identical rows in updates.
 
     Returns:
         If `returning=True`, the upserted result, an iterable list of all upsert objects.
@@ -707,7 +707,7 @@ def upsert(
             update_fields=update_fields,
             returning=returning,
             exclude=exclude,
-            ignore_identical=ignore_identical,
+            ignore_unchanged=ignore_unchanged,
             cursor=cursor,
         )
 
@@ -720,7 +720,7 @@ async def aupsert(
     *,
     exclude: Union[List[str], None] = None,
     returning: Union[List[str], bool] = False,
-    ignore_identical: bool = False,
+    ignore_unchanged: bool = False,
 ) -> Union[UpsertResult, None]:
     """
     Perform an asynchronous bulk upsert.
@@ -739,5 +739,5 @@ async def aupsert(
         update_fields=update_fields,
         returning=returning,
         exclude=exclude,
-        ignore_identical=ignore_identical,
+        ignore_unchanged=ignore_unchanged,
     )

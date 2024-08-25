@@ -87,7 +87,7 @@ pgbulk.upsert(
     ],
     ["int_field"],
     ["some_attr"],
-    ignore_identical=True
+    ignore_unchanged=True
 )
 ```
 
@@ -156,7 +156,7 @@ print(results[0].int_field)
 
 #### Don't apply updates if the rows are identical
 
-Use `ignore_identical=True` to avoid identical updates:
+Use `ignore_unchanged=True` to avoid identical updates:
 
 ```python
 pgbulk.upsert(
@@ -166,7 +166,7 @@ pgbulk.upsert(
         MyModel(int_field=2, some_attr="some_val2"),
     ],
     ["int_field"],
-    ignore_identical=True
+    ignore_unchanged=True
 )
 ```
 

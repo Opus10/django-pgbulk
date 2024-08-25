@@ -46,7 +46,7 @@ def test_func_field_upsert():
         [models.TestFuncFieldModel(my_key="a", int_val=0)],
         ["my_key"],
         [pgbulk.UpdateField("int_val", expression=F("int_val") - 3)],
-        ignore_identical=True,
+        ignore_unchanged=True,
         returning=True,
     )
     assert models.TestFuncFieldModel.objects.count() == 1
@@ -58,7 +58,7 @@ def test_func_field_upsert():
         [models.TestFuncFieldModel(my_key="a", int_val=-2)],
         ["my_key"],
         [pgbulk.UpdateField("int_val")],
-        ignore_identical=True,
+        ignore_unchanged=True,
         returning=True,
     )
     assert models.TestFuncFieldModel.objects.count() == 1
@@ -419,7 +419,7 @@ def test_upsert_update_duplicate_fields_returning_none_updated():
         ["int_field"],
         ["char_field", "float_field"],
         returning=True,
-        ignore_identical=True,
+        ignore_unchanged=True,
     )
 
     assert list(results) == []
@@ -449,7 +449,7 @@ def test_upsert_update_duplicate_fields_returning_some_updated():
         ["int_field"],
         ["char_field", "float_field"],
         returning=["char_field"],
-        ignore_identical=True,
+        ignore_unchanged=True,
     )
 
     assert len(results.updated) == 1
@@ -889,9 +889,9 @@ def test_update_no_fields_given():
 
 
 @pytest.mark.django_db
-def test_update_returning_ignore_identical():
+def test_update_returning_ignore_unchanged():
     """
-    Tests updating with returning and with ignore_identical=True
+    Tests updating with returning and with ignore_unchanged=True
     """
     test_obj_1 = ddf.G(models.TestModel, int_field=1, float_field=2)
     test_obj_2 = ddf.G(models.TestModel, int_field=2, float_field=3)
@@ -911,7 +911,7 @@ def test_update_returning_ignore_identical():
     test_obj_1.refresh_from_db()
     test_obj_2.refresh_from_db()
     assert not pgbulk.update(
-        models.TestModel, [test_obj_2, test_obj_1], ignore_identical=True, returning=True
+        models.TestModel, [test_obj_2, test_obj_1], ignore_unchanged=True, returning=True
     )
 
     test_obj_1.int_field = 1

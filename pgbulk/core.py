@@ -771,7 +771,7 @@ def copy(
         copy_fields: A list of fields on the model objects to copy.
             If `None`, all fields will be copied.
         exclude: A list of fields to exclude from the copy. This is useful
-            when `update_fields` is `None` and you want to exclude fields from
+            when `copy_fields` is `None` and you want to exclude fields from
             being copied.
 
     Note:

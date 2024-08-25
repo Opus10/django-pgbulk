@@ -12,50 +12,56 @@ Bulk copies can significantly speed-up bulk inserts, sometimes by an order of ma
 
 ### Examples
 
-Do a bulk upsert on a model:
+#### Update or insert rows
 
-    import pgbulk
+```python
+import pgbulk
 
-    pgbulk.upsert(
-        MyModel,
-        [
-            MyModel(int_field=1, some_attr="some_val1"),
-            MyModel(int_field=2, some_attr="some_val2"),
-        ],
-        # These are the fields that identify the uniqueness constraint.
-        ["int_field"],
-        # These are the fields that will be updated if the row already
-        # exists. If not provided, all fields will be updated
-        ["some_attr"]
-    )
+pgbulk.upsert(
+    MyModel,
+    [
+        MyModel(int_field=1, some_attr="some_val1"),
+        MyModel(int_field=2, some_attr="some_val2"),
+    ],
+    # These are the fields that identify the uniqueness constraint.
+    ["int_field"],
+    # These are the fields that will be updated if the row already
+    # exists. If not provided, all fields will be updated
+    ["some_attr"]
+)
+```
 
-Do a bulk update on a model:
+#### Bulk update rows
 
-    import pgbulk
+```python
+import pgbulk
 
-    pgbulk.update(
-        MyModel,
-        [
-            MyModel(id=1, some_attr='some_val1'),
-            MyModel(id=2, some_attr='some_val2')
-        ],
-        # These are the fields that will be updated. If not provided,
-        # all fields will be updated
-        ['some_attr']
-    )
+pgbulk.update(
+    MyModel,
+    [
+        MyModel(id=1, some_attr='some_val1'),
+        MyModel(id=2, some_attr='some_val2')
+    ],
+    # These are the fields that will be updated. If not provided,
+    # all fields will be updated
+    ['some_attr']
+)
+```
 
-Do a bulk copy on a model:
+#### Copy rows into a table
 
-    import pgbulk
+```python
+import pgbulk
 
-    pgbulk.copy(
-        MyModel,
-        # Insert these rows using COPY FROM
-        [
-            MyModel(id=1, some_attr='some_val1'),
-            MyModel(id=2, some_attr='some_val2')
-        ],
-    )
+pgbulk.copy(
+    MyModel,
+    # Insert these rows using COPY FROM
+    [
+        MyModel(id=1, some_attr='some_val1'),
+        MyModel(id=2, some_attr='some_val2')
+    ],
+)
+```
 
 ### Advanced Features
 

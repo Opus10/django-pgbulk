@@ -12,7 +12,9 @@
 
 ## Quick Start
 
-Do a bulk upsert on a model:
+### Examples
+
+#### Update or insert rows
 
 ```python
 import pgbulk
@@ -31,7 +33,7 @@ pgbulk.upsert(
 )
 ```
 
-Do a bulk update on a model:
+#### Bulk update rows
 
 ```python
 import pgbulk
@@ -48,7 +50,7 @@ pgbulk.update(
 )
 ```
 
-Do a bulk copy on a model:
+#### Copy rows into a table
 
 ```python
 import pgbulk
@@ -63,7 +65,7 @@ pgbulk.copy(
 )
 ```
 
-## Advanced Features
+### Advanced Features
 
 Here are some advanced features at a glance:
 

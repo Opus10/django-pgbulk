@@ -437,7 +437,7 @@ def _upsert(
     returning: Union[List[str], bool],
     ignore_identical: bool,
     cursor: "CursorWrapper",
-) -> UpsertResult | None:
+) -> Union[UpsertResult, None]:
     """Internal implementation of bulk upsert."""
     exclude = exclude or []
 
@@ -479,7 +479,7 @@ def _update(
     returning: Union[List[str], bool],
     ignore_identical: bool,
     cursor: "CursorWrapper",
-) -> List["Row"] | None:
+) -> Union[List["Row"], None]:
     """
     Core update implementation
     """
@@ -590,7 +590,7 @@ def update(
     exclude: Union[List[str], None] = None,
     returning: Union[List[str], bool] = False,
     ignore_identical: bool = False,
-) -> None:
+) -> Union[List["Row"], None]:
     """
     Performs a bulk update.
 
@@ -609,21 +609,8 @@ def update(
     Note:
         Model signals such as `post_save` are not emitted.
 
-    Example:
-        Update an attribute of multiple models in bulk::
-
-            import pgbulk
-
-            pgbulk.update(
-                MyModel,
-                [
-                    MyModel(id=1, some_attr='some_val1'),
-                    MyModel(id=2, some_attr='some_val2')
-                ],
-                # These are the fields that will be updated. If not provided,
-                # all fields will be updated
-                ['some_attr']
-            )
+    Returns:
+        If `returning=True`, an iterable list of all updated objects.
     """
     queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
     with connections[queryset.db].cursor() as cursor:
@@ -646,7 +633,7 @@ async def aupdate(
     exclude: Union[List[str], None] = None,
     returning: Union[List[str], bool] = False,
     ignore_identical: bool = False,
-) -> None:
+) -> Union[List["Row"], None]:
     """
     Perform an asynchronous bulk update.
 
@@ -676,7 +663,7 @@ def upsert(
     exclude: Union[List[str], None] = None,
     returning: Union[List[str], bool] = False,
     ignore_identical: bool = False,
-) -> UpsertResult:
+) -> Union[UpsertResult, None]:
     """
     Perform a bulk upsert.
 
@@ -701,88 +688,12 @@ def upsert(
         ignore_identical: Ignore identical rows in updates.
 
     Returns:
-        The upsert result, an iterable list of all upsert objects. Use the `.updated`
-            and `.created` attributes to iterate over created or updated elements.
+        If `returning=True`, the upserted result, an iterable list of all upsert objects.
+            Use the `.updated` and `.created` attributes to iterate over created or updated
+            elements.
 
     Note:
         Model signals such as `post_save` are not emitted.
-
-    Example:
-        A basic bulk upsert on a model:
-
-            import pgbulk
-
-            pgbulk.upsert(
-                MyModel,
-                [
-                    MyModel(int_field=1, some_attr="some_val1"),
-                    MyModel(int_field=2, some_attr="some_val2"),
-                ],
-                # These are the fields that identify the uniqueness constraint.
-                ["int_field"],
-                # These are the fields that will be updated if the row already
-                # exists. If not provided, all fields will be updated
-                ["some_attr"]
-            )
-
-    Example:
-        Return the results of an upsert:
-
-            results = pgbulk.upsert(
-                MyModel,
-                [
-                    MyModel(int_field=1, some_attr="some_val1"),
-                    MyModel(int_field=2, some_attr="some_val2"),
-                ],
-                ["int_field"],
-                ["some_attr"],
-                # `True` will return all columns. One can also explicitly
-                # list which columns will be returned
-                returning=True
-            )
-
-            # Print which results were created
-            print(results.created)
-
-            # Print which results were updated.
-            # By default, if an update results in no changes, it will not
-            # be updated and will not be returned.
-            print(results.updated)
-
-    Example:
-        Don't apply updates if the rows are identical:
-
-            pgbulk.upsert(
-                MyModel,
-                [
-                    MyModel(int_field=1, some_attr="some_val1"),
-                    MyModel(int_field=2, some_attr="some_val2"),
-                ],
-                ["int_field"],
-                ["some_attr"],
-                ignore_identical=True
-            )
-
-    Example:
-        Use an expression for a field if an update happens. In the example
-        below, we increment `some_int_field` by one whenever an update happens.
-        Otherwise it defaults to zero:
-
-            results = pgbulk.upsert(
-                MyModel,
-                [
-                    MyModel(some_int_field=0, some_key="a"),
-                    MyModel(some_int_field=0, some_key="b")
-                ],
-                ["some_key"],
-                [
-                    # Use UpdateField to specify an expression for the update.
-                    pgbulk.UpdateField(
-                        "some_int_field",
-                        expression=models.F("some_int_field") + 1
-                    )
-                ],
-            )
     """
     queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
     with connections[queryset.db].cursor() as cursor:
@@ -807,7 +718,7 @@ async def aupsert(
     exclude: Union[List[str], None] = None,
     returning: Union[List[str], bool] = False,
     ignore_identical: bool = False,
-) -> UpsertResult:
+) -> Union[UpsertResult, None]:
     """
     Perform an asynchronous bulk upsert.
 

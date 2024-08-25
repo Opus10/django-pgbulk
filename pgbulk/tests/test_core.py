@@ -46,7 +46,7 @@ def test_func_field_upsert():
         [models.TestFuncFieldModel(my_key="a", int_val=0)],
         ["my_key"],
         [pgbulk.UpdateField("int_val", expression=F("int_val") - 3)],
-        redundant_updates=False,
+        ignore_identical=True,
         returning=True,
     )
     assert models.TestFuncFieldModel.objects.count() == 1
@@ -58,7 +58,7 @@ def test_func_field_upsert():
         [models.TestFuncFieldModel(my_key="a", int_val=-2)],
         ["my_key"],
         [pgbulk.UpdateField("int_val")],
-        redundant_updates=False,
+        ignore_identical=True,
         returning=True,
     )
     assert models.TestFuncFieldModel.objects.count() == 1
@@ -419,7 +419,7 @@ def test_upsert_update_duplicate_fields_returning_none_updated():
         ["int_field"],
         ["char_field", "float_field"],
         returning=True,
-        redundant_updates=False,
+        ignore_identical=True,
     )
 
     assert list(results) == []
@@ -449,7 +449,7 @@ def test_upsert_update_duplicate_fields_returning_some_updated():
         ["int_field"],
         ["char_field", "float_field"],
         returning=["char_field"],
-        redundant_updates=False,
+        ignore_identical=True,
     )
 
     assert len(results.updated) == 1
@@ -482,7 +482,6 @@ def test_upsert_update_duplicate_fields_returning_some_updated_ignore_dups():
         ["int_field"],
         ["char_field", "float_field"],
         returning=["char_field"],
-        redundant_updates=True,
     )
 
     assert len(results.updated) == 3

@@ -296,13 +296,29 @@ def _model_fields(model: Type[models.Model]) -> List["models.Field[Any, Any]"]:
     return [f for f in model._meta.fields if not getattr(f, "generated", False) and f.concrete]
 
 
+def _ignore_identical_sql(
+    model: Type[models.Model],
+    update_db_fields: List["models.Field[Any, Any]"],
+    update_fields_expressions: List[str],
+) -> str:
+    return (
+        " WHERE ({update_fields_sql}) IS DISTINCT FROM ({excluded_update_fields_sql}) "
+    ).format(
+        update_fields_sql=", ".join(
+            "{0}.{1}".format(model._meta.db_table, _quote(field.column))
+            for field in update_db_fields
+        ),
+        excluded_update_fields_sql=", ".join(update_fields_expressions),
+    )
+
+
 def _get_upsert_sql(
     queryset: models.QuerySet[_M],
     model_objs: Iterable[_M],
     unique_fields: List[str],
     update_fields: List[Union[str, UpdateField]],
     returning: Union[List[str], bool],
-    redundant_updates: bool = False,
+    ignore_identical: bool = False,
 ) -> Tuple[str, List[Any]]:
     """
     Generates the postgres specific sql necessary to perform an upsert
@@ -354,20 +370,14 @@ def _get_upsert_sql(
     )
 
     return_sql = "RETURNING " + _get_return_fields_sql(returning) if returning else ""
-    ignore_duplicates_sql = ""
-    if not redundant_updates:
-        ignore_duplicates_sql = (
-            " WHERE ({update_fields_sql}) IS DISTINCT FROM ({excluded_update_fields_sql}) "
-        ).format(
-            update_fields_sql=", ".join(
-                "{0}.{1}".format(model._meta.db_table, _quote(field.column))
-                for field in update_db_fields
-            ),
-            excluded_update_fields_sql=", ".join(update_fields_expressions.values()),
+    ignore_identical_sql = ""
+    if ignore_identical:
+        ignore_identical_sql = _ignore_identical_sql(
+            model, update_db_fields, list(update_fields_expressions.values())
         )
 
     on_conflict = (
-        "DO UPDATE SET {0} {1}".format(update_fields_sql, ignore_duplicates_sql)
+        "DO UPDATE SET {0} {1}".format(update_fields_sql, ignore_identical_sql)
         if update_db_fields
         else "DO NOTHING"
     )
@@ -395,7 +405,7 @@ def _fetch(
     unique_fields: List[str],
     update_fields: List[Union[str, UpdateField]],
     returning: Union[List[str], bool],
-    redundant_updates: bool = False,
+    ignore_identical: bool = False,
 ):
     """
     Perfom the upsert
@@ -410,7 +420,7 @@ def _fetch(
             unique_fields,
             update_fields,
             returning,
-            redundant_updates=redundant_updates,
+            ignore_identical=ignore_identical,
         )
 
         with connection.cursor() as cursor:
@@ -431,7 +441,7 @@ def _upsert(
     update_fields: UpdateFieldsTypeDef = None,
     exclude: Union[List[str], None] = None,
     returning: Union[List[str], bool] = False,
-    redundant_updates: bool = False,
+    ignore_identical: bool = False,
 ):
     """
     Perform a bulk upsert on a table.
@@ -455,8 +465,7 @@ def _upsert(
             being updated. This is additive to the `unique_fields` list.
         returning: If True, returns all fields. If a list,
             only returns fields in the list.
-        redundant_updates: Don't perform an update
-            if all columns are identical to the row in the database.
+        ignore_identical: Ignore identical rows in updates.
     """
     exclude = exclude or []
     queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
@@ -474,7 +483,7 @@ def _upsert(
         unique_fields,
         update_fields,
         returning,
-        redundant_updates=redundant_updates,
+        ignore_identical=ignore_identical,
     )
 
 
@@ -483,6 +492,7 @@ def update(
     model_objs: Iterable[_M],
     update_fields: Union[List[str], None] = None,
     exclude: Union[List[str], None] = None,
+    ignore_identical: bool = False,
 ) -> None:
     """
     Performs a bulk update.
@@ -495,6 +505,7 @@ def update(
         exclude: A list of fields to exclude from the update. This is useful
             when `update_fields` is `None` and you want to exclude fields from
             being updated.
+        ignore_identical: Ignore identical rows in updates.
 
     Note:
         Model signals such as `post_save` are not emitted.
@@ -599,6 +610,7 @@ async def aupdate(
     model_objs: Iterable[_M],
     update_fields: Union[List[str], None] = None,
     exclude: Union[List[str], None] = None,
+    ignore_identical: bool = False,
 ) -> None:
     """
     Perform an asynchronous bulk update.
@@ -610,7 +622,13 @@ async def aupdate(
         a `sync_to_async` wrapper. It does not yet use an asynchronous database
         driver but will in the future.
     """
-    return await sync_to_async(update)(queryset, model_objs, update_fields, exclude)
+    return await sync_to_async(update)(
+        queryset,
+        model_objs,
+        update_fields=update_fields,
+        exclude=exclude,
+        ignore_identical=ignore_identical,
+    )
 
 
 def upsert(
@@ -621,7 +639,7 @@ def upsert(
     *,
     exclude: Union[List[str], None] = None,
     returning: Union[List[str], bool] = False,
-    redundant_updates: bool = False,
+    ignore_identical: bool = False,
 ) -> UpsertResult:
     """
     Perform a bulk upsert.
@@ -644,8 +662,7 @@ def upsert(
             being updated. This is additive to the `unique_fields` list.
         returning: If True, returns all fields. If a list, only returns fields
             in the list. If False, do not return results from the upsert.
-        redundant_updates: Perform an update
-            even if all columns are identical to the row in the database.
+        ignore_identical: Ignore identical rows in updates.
 
     Returns:
         The upsert result, an iterable list of all upsert objects. Use the `.updated`
@@ -697,10 +714,7 @@ def upsert(
             print(results.updated)
 
     Example:
-        Upsert values and update rows even when the update is meaningless
-        (i.e. a redundant update). This is turned off by default, but it
-        can be enabled in case postgres triggers or other processes
-        need to happen as a result of an update:
+        Don't apply updates if the rows are identical:
 
             pgbulk.upsert(
                 MyModel,
@@ -710,8 +724,7 @@ def upsert(
                 ],
                 ["int_field"],
                 ["some_attr"],
-                # Perform updates in the database even if it's identical
-                redundant_updates=True
+                ignore_identical=True
             )
 
     Example:
@@ -742,7 +755,7 @@ def upsert(
         update_fields=update_fields,
         returning=returning,
         exclude=exclude,
-        redundant_updates=redundant_updates,
+        ignore_identical=ignore_identical,
     )
 
 
@@ -754,7 +767,7 @@ async def aupsert(
     *,
     returning: Union[List[str], bool] = False,
     exclude: Union[List[str], None] = None,
-    redundant_updates: bool = False,
+    ignore_identical: bool = False,
 ) -> UpsertResult:
     """
     Perform an asynchronous bulk upsert.
@@ -769,9 +782,9 @@ async def aupsert(
     return await sync_to_async(upsert)(
         queryset,
         model_objs,
-        unique_fields,
-        update_fields,
+        unique_fields=unique_fields,
+        update_fields=update_fields,
         returning=returning,
         exclude=exclude,
-        redundant_updates=redundant_updates,
+        ignore_identical=ignore_identical,
     )

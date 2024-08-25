@@ -143,7 +143,7 @@ def _quote(field: str, cursor: "CursorWrapper") -> str:
     else:
         return (
             Escaping(cursor.connection.pgconn)  # type: ignore
-            .escape_identifier(data=field.encode())
+            .escape_identifier(field.encode())
             .decode()
         )
 

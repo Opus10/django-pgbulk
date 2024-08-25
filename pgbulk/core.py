@@ -64,8 +64,10 @@ psycopg_maj_version = psycopg_version[0]
 
 if psycopg_maj_version == 2:
     from psycopg2.extensions import AsIs as Literal  # type: ignore
+    from psycopg2.extensions import quote_ident  # type: ignore
 elif psycopg_maj_version == 3:
     import psycopg.adapt  # type: ignore
+    from psycopg.pq import Escaping  # type: ignore
 
     class LiteralValue:  # pragma: no cover
         def __init__(self, val: str) -> None:
@@ -134,8 +136,11 @@ class UpsertResult(List["Row"]):
         return [i for i in self if i.status_ == "u"]
 
 
-def _quote(field: str) -> str:
-    return '"{0}"'.format(field)
+def _quote(field: str, cursor: "CursorWrapper") -> str:
+    if psycopg_maj_version == 2:
+        return quote_ident(field, cursor.cursor)  # type: ignore
+    else:
+        return Escaping.escape_identifier(field)  # type: ignore
 
 
 def _get_update_fields(
@@ -193,17 +198,20 @@ def _fill_auto_fields(queryset: models.QuerySet[_M], values: Iterable[_M]) -> It
 
 def _prep_sql_args(
     queryset: models.QuerySet[_M],
-    connection: "DefaultConnectionProxy",
     cursor: "CursorWrapper",
     sql_args: List[Any],
 ) -> List[Any]:
     if psycopg_maj_version == 3:
         cursor.adapters.register_dumper(LiteralValue, LiteralDumper)  # type: ignore
 
-    compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)  # type: ignore
+    compiler = SQLCompiler(
+        query=queryset.query,
+        connection=cursor.connection,
+        using=queryset.using,  # type: ignore
+    )
 
     return [
-        LiteralValue(cursor.mogrify(*sql_arg.as_sql(compiler, connection)).decode("utf-8"))
+        LiteralValue(cursor.mogrify(*sql_arg.as_sql(compiler, cursor.connection)).decode("utf-8"))
         if hasattr(sql_arg, "as_sql")
         else sql_arg
         for sql_arg in sql_args
@@ -285,8 +293,8 @@ def _get_values_for_rows(
     return row_values, sql_args
 
 
-def _get_return_fields_sql(returning: List[str]) -> str:
-    return_fields_sql = ", ".join(_quote(field) for field in returning)
+def _get_return_fields_sql(returning: List[str], cursor: "CursorWrapper") -> str:
+    return_fields_sql = ", ".join(_quote(field, cursor) for field in returning)
     return_fields_sql += ", CASE WHEN xmax = 0 THEN 'c' ELSE 'u' END AS status_"
     return return_fields_sql
 
@@ -297,18 +305,14 @@ def _model_fields(model: Type[models.Model]) -> List["models.Field[Any, Any]"]:
 
 
 def _ignore_identical_sql(
-    model: Type[models.Model],
-    update_db_fields: List["models.Field[Any, Any]"],
-    update_fields_expressions: List[str],
+    model: Type[models.Model], cols: List[str], expressions: List[str], cursor: "CursorWrapper"
 ) -> str:
-    return (
-        " WHERE ({update_fields_sql}) IS DISTINCT FROM ({excluded_update_fields_sql}) "
-    ).format(
-        update_fields_sql=", ".join(
-            "{0}.{1}".format(model._meta.db_table, _quote(field.column))
-            for field in update_db_fields
+    return ("(({fields_sql}) IS DISTINCT FROM ({expressions_sql}))").format(
+        fields_sql=", ".join(
+            "{0}.{1}".format(_quote(model._meta.db_table, cursor), _quote(col, cursor))
+            for col in cols
         ),
-        excluded_update_fields_sql=", ".join(update_fields_expressions),
+        expressions_sql=", ".join(expressions),
     )
 
 
@@ -318,7 +322,8 @@ def _get_upsert_sql(
     unique_fields: List[str],
     update_fields: List[Union[str, UpdateField]],
     returning: Union[List[str], bool],
-    ignore_identical: bool = False,
+    ignore_identical: bool,
+    cursor: "CursorWrapper",
 ) -> Tuple[str, List[Any]]:
     """
     Generates the postgres specific sql necessary to perform an upsert
@@ -340,18 +345,16 @@ def _get_upsert_sql(
 
     all_field_names = [field.column for field in all_fields]
     returning = returning if returning is not True else [f.column for f in _model_fields(model)]
-    all_field_names_sql = ", ".join([_quote(field) for field in all_field_names])
+    all_field_names_sql = ", ".join([_quote(field, cursor) for field in all_field_names])
 
     # Convert field names to db column names
-    unique_db_fields = [model._meta.get_field(unique_field) for unique_field in unique_fields]
-    update_db_fields = [model._meta.get_field(update_field) for update_field in update_fields]
+    unique_db_cols = [model._meta.get_field(unique_field).column for unique_field in unique_fields]
+    update_db_cols = [model._meta.get_field(update_field).column for update_field in update_fields]
 
     row_values, sql_args = _get_values_for_rows(queryset, model_objs, all_fields)
 
-    unique_field_names_sql = ", ".join([_quote(field.column) for field in unique_db_fields])
-    update_fields_expressions = {
-        field.column: f"EXCLUDED.{_quote(field.column)}" for field in update_db_fields
-    }
+    unique_field_names_sql = ", ".join([_quote(col, cursor) for col in unique_db_cols])
+    update_fields_expressions = {col: f"EXCLUDED.{_quote(col, cursor)}" for col in update_db_cols}
     if update_expressions:
         connection = connections[queryset.db]
         compiler = SQLCompiler(query=queryset.query, connection=connection, using=queryset.using)  # type: ignore
@@ -365,20 +368,23 @@ def _get_upsert_sql(
                 update_fields_expressions[model._meta.get_field(field_name).column] = val
 
     update_fields_sql = ", ".join(
-        f"{_quote(field.column)} = {update_fields_expressions[field.column]}"
-        for field in update_db_fields
+        f"{_quote(col, cursor)} = {update_fields_expressions[col]}" for col in update_db_cols
     )
 
-    return_sql = "RETURNING " + _get_return_fields_sql(returning) if returning else ""
+    return_sql = "RETURNING " + _get_return_fields_sql(returning, cursor) if returning else ""
     ignore_identical_sql = ""
-    if ignore_identical:
+    if ignore_identical and update_db_cols:
         ignore_identical_sql = _ignore_identical_sql(
-            model, update_db_fields, list(update_fields_expressions.values())
+            model,
+            cols=update_db_cols,
+            expressions=list(update_fields_expressions.values()),
+            cursor=cursor,
         )
+        ignore_identical_sql = f" WHERE {ignore_identical_sql} "
 
     on_conflict = (
         "DO UPDATE SET {0} {1}".format(update_fields_sql, ignore_identical_sql)
-        if update_db_fields
+        if update_db_cols
         else "DO NOTHING"
     )
 
@@ -399,76 +405,18 @@ def _get_upsert_sql(
     return sql, sql_args
 
 
-def _fetch(
+def _upsert(
     queryset: models.QuerySet[_M],
     model_objs: Iterable[_M],
     unique_fields: List[str],
-    update_fields: List[Union[str, UpdateField]],
+    update_fields: UpdateFieldsTypeDef,
+    exclude: Union[List[str], None],
     returning: Union[List[str], bool],
-    ignore_identical: bool = False,
-):
-    """
-    Perfom the upsert
-    """
-    connection = connections[queryset.db]
-    upserted: List["Row"] = []
-
-    if model_objs:
-        sql, sql_args = _get_upsert_sql(
-            queryset,
-            model_objs,
-            unique_fields,
-            update_fields,
-            returning,
-            ignore_identical=ignore_identical,
-        )
-
-        with connection.cursor() as cursor:
-            sql_args = _prep_sql_args(queryset, connection, cursor, sql_args)
-            cursor.execute(sql, sql_args)
-            if cursor.description:
-                result = [(col.name, Any) for col in cursor.description]
-                nt_result = NamedTuple("Result", result)
-                upserted = cast(List["Row"], [nt_result(*row) for row in cursor.fetchall()])
-
-    return UpsertResult(upserted)
-
-
-def _upsert(
-    queryset: QuerySet[_M],
-    model_objs: Iterable[_M],
-    unique_fields: List[str],
-    update_fields: UpdateFieldsTypeDef = None,
-    exclude: Union[List[str], None] = None,
-    returning: Union[List[str], bool] = False,
-    ignore_identical: bool = False,
-):
-    """
-    Perform a bulk upsert on a table.
-
-    Args:
-        queryset: A model or a queryset that defines the
-            collection to upsert.
-        model_objs: An iterable of Django models to upsert.
-        unique_fields: A list of fields that define the uniqueness
-            of the model. The model must have a unique constraint on these
-            fields.
-        update_fields: A list of fields to update
-            whenever objects already exist. If an empty list is provided, it
-            is equivalent to doing a bulk insert on the objects that don't
-            exist. If `None`, all fields will be updated. If you want to
-            perform an expression such as an `F` object on a field when
-            it is updated, use the [pgbulk.UpdateField][] class. See
-            examples below.
-        exclude: A list of fields to exclude from the upsert. This is useful
-            when `update_fields` is `None` and you want to exclude fields from
-            being updated. This is additive to the `unique_fields` list.
-        returning: If True, returns all fields. If a list,
-            only returns fields in the list.
-        ignore_identical: Ignore identical rows in updates.
-    """
+    ignore_identical: bool,
+    cursor: "CursorWrapper",
+) -> UpsertResult:
+    """Internal implementation of bulk upsert."""
     exclude = exclude or []
-    queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
 
     # Populate automatically generated fields in the rows like date times
     _fill_auto_fields(queryset, model_objs)
@@ -477,14 +425,121 @@ def _upsert(
     model_objs = _sort_by_unique_fields(queryset, model_objs, unique_fields)
     update_fields = _get_update_fields(queryset, update_fields, exclude=[*exclude, *unique_fields])  # type: ignore
 
-    return _fetch(
-        queryset,
-        model_objs,
-        unique_fields,
-        update_fields,
-        returning,
-        ignore_identical=ignore_identical,
+    upserted: List["Row"] = []
+
+    if model_objs:
+        sql, sql_args = _get_upsert_sql(
+            queryset,
+            model_objs,
+            unique_fields=unique_fields,
+            update_fields=update_fields,
+            returning=returning,
+            ignore_identical=ignore_identical,
+            cursor=cursor,
+        )
+
+        sql_args = _prep_sql_args(queryset, cursor=cursor, sql_args=sql_args)
+        cursor.execute(sql, sql_args)
+        if cursor.description:
+            result = [(col.name, Any) for col in cursor.description]
+            nt_result = NamedTuple("Result", result)
+            upserted = cast(List["Row"], [nt_result(*row) for row in cursor.fetchall()])
+
+    return UpsertResult(upserted)
+
+
+def _update(
+    queryset: models.QuerySet[_M],
+    model_objs: Iterable[_M],
+    update_fields: Union[List[str], None],
+    exclude: Union[List[str], None],
+    ignore_identical: bool,
+    cursor: "CursorWrapper",
+) -> None:
+    """
+    Core update implementation
+    """
+    model = queryset.model
+    connection = connections[queryset.db]
+    alias = "new_values"
+    update_fields = _get_update_fields(queryset, update_fields, exclude)  # type: ignore
+    update_db_cols = [model._meta.get_field(update_field).column for update_field in update_fields]
+
+    # Sort the model objects to reduce the likelihood of deadlocks
+    model_objs = sorted(model_objs, key=lambda obj: obj.pk)
+
+    if not model._meta.pk:  # pragma: no cover - for type-safety
+        raise ValueError("Model must have a primary key to perform a bulk update.")
+
+    # Add the pk to the value fields so we can join during the update.
+    value_fields = [model._meta.pk.attname] + update_fields
+
+    row_values = [
+        [
+            _get_field_db_val(
+                queryset,
+                model_obj._meta.get_field(field),
+                getattr(model_obj, model_obj._meta.get_field(field).attname),
+                connection,
+            )
+            for field in value_fields
+        ]
+        for model_obj in model_objs
+    ]
+
+    # If we do not have any values or fields to update, just return
+    if len(row_values) == 0 or len(update_fields) == 0:
+        return None
+
+    db_types = [model._meta.get_field(field).db_type(connection) for field in value_fields]
+
+    value_fields_sql = ", ".join(
+        "{field}".format(field=_quote(model._meta.get_field(field).column, cursor))
+        for field in value_fields
     )
+
+    update_fields_sql = ", ".join(
+        '{field} = "{alias}".{field}'.format(field=_quote(col, cursor), alias=alias)
+        for col in update_db_cols
+    )
+
+    values_sql = ", ".join(
+        [
+            "({0})".format(
+                ", ".join(
+                    [
+                        "%s::{0}".format(db_types[i]) if not row_number and i else "%s"
+                        for i, _ in enumerate(row)
+                    ]
+                )
+            )
+            for row_number, row in enumerate(row_values)
+        ]
+    )
+
+    update_sql = (
+        "UPDATE {table} "
+        "SET {update_fields_sql} "
+        "FROM (VALUES {values_sql}) AS {alias} ({value_fields_sql}) "
+        'WHERE {table}.{pk_field} = "new_values".{pk_field}'
+    ).format(
+        table=_quote(model._meta.db_table, cursor),
+        pk_field=_quote(model._meta.pk.column, cursor),
+        alias=alias,
+        update_fields_sql=update_fields_sql,
+        values_sql=values_sql,
+        value_fields_sql=value_fields_sql,
+    )
+    if ignore_identical:
+        expressions = [f"{alias}.{_quote(col, cursor)}" for col in update_db_cols]
+        ignore_identical_sql = _ignore_identical_sql(
+            model, cols=update_db_cols, expressions=expressions, cursor=cursor
+        )
+        update_sql += f" AND {ignore_identical_sql}"
+
+    update_sql_params = list(itertools.chain(*row_values))
+    update_sql_params = _prep_sql_args(queryset, cursor=cursor, sql_args=update_sql_params)
+    cursor.execute(update_sql, update_sql_params)
 
 
 def update(
@@ -527,82 +582,15 @@ def update(
             )
     """
     queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
-
-    connection = connections[queryset.db]
-    model = queryset.model
-    upsert_update_fields = _get_update_fields(queryset, update_fields, exclude)  # type: ignore
-
-    # Sort the model objects to reduce the likelihood of deadlocks
-    model_objs = sorted(model_objs, key=lambda obj: obj.pk)
-
-    if not model._meta.pk:  # pragma: no cover - for type-safety
-        raise ValueError("Model must have a primary key to perform a bulk update.")
-
-    # Add the pk to the value fields so we can join during the update.
-    value_fields = [model._meta.pk.attname] + upsert_update_fields
-
-    row_values = [
-        [
-            _get_field_db_val(
-                queryset,
-                model_obj._meta.get_field(field),
-                getattr(model_obj, model_obj._meta.get_field(field).attname),
-                connection,
-            )
-            for field in value_fields
-        ]
-        for model_obj in model_objs
-    ]
-
-    # If we do not have any values or fields to update, just return
-    if len(row_values) == 0 or len(upsert_update_fields) == 0:
-        return None
-
-    db_types = [model._meta.get_field(field).db_type(connection) for field in value_fields]
-
-    value_fields_sql = ", ".join(
-        '"{field}"'.format(field=model._meta.get_field(field).column) for field in value_fields
-    )
-
-    update_fields_sql = ", ".join(
-        [
-            '"{field}" = "new_values"."{field}"'.format(field=model._meta.get_field(field).column)
-            for field in upsert_update_fields
-        ]
-    )
-
-    values_sql = ", ".join(
-        [
-            "({0})".format(
-                ", ".join(
-                    [
-                        "%s::{0}".format(db_types[i]) if not row_number and i else "%s"
-                        for i, _ in enumerate(row)
-                    ]
-                )
-            )
-            for row_number, row in enumerate(row_values)
-        ]
-    )
-
-    update_sql = (
-        "UPDATE {table} "
-        "SET {update_fields_sql} "
-        "FROM (VALUES {values_sql}) AS new_values ({value_fields_sql}) "
-        'WHERE "{table}"."{pk_field}" = "new_values"."{pk_field}"'
-    ).format(
-        table=model._meta.db_table,
-        pk_field=model._meta.pk.column,
-        update_fields_sql=update_fields_sql,
-        values_sql=values_sql,
-        value_fields_sql=value_fields_sql,
-    )
-
-    update_sql_params = list(itertools.chain(*row_values))
-
-    with connection.cursor() as cursor:
-        update_sql_params = _prep_sql_args(queryset, connection, cursor, update_sql_params)
-        cursor.execute(update_sql, update_sql_params)
+    with connections[queryset.db].cursor() as cursor:
+        return _update(
+            queryset=queryset,
+            model_objs=model_objs,
+            update_fields=update_fields,
+            exclude=exclude,
+            ignore_identical=ignore_identical,
+            cursor=cursor,
+        )
 
 
 async def aupdate(
@@ -748,15 +736,18 @@ def upsert(
                 ],
             )
     """
-    return _upsert(
-        queryset,
-        model_objs,
-        unique_fields,
-        update_fields=update_fields,
-        returning=returning,
-        exclude=exclude,
-        ignore_identical=ignore_identical,
-    )
+    queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()
+    with connections[queryset.db].cursor() as cursor:
+        return _upsert(
+            queryset,
+            model_objs,
+            unique_fields=unique_fields,
+            update_fields=update_fields,
+            returning=returning,
+            exclude=exclude,
+            ignore_identical=ignore_identical,
+            cursor=cursor,
+        )
 
 
 async def aupsert(

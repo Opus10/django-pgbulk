@@ -889,6 +889,29 @@ def test_update_no_fields_given():
 
 
 @pytest.mark.django_db
+def test_update_ignore_identical():
+    """
+    Tests updating when ignore_identical=True
+    """
+    test_obj_1 = ddf.G(models.TestModel, int_field=1, float_field=2)
+    test_obj_2 = ddf.G(models.TestModel, int_field=2, float_field=3)
+    test_obj_1.int_field = 7
+    test_obj_1.float_field = 8
+    test_obj_2.int_field = 9
+    test_obj_2.float_field = 10
+
+    pgbulk.update(models.TestModel, [test_obj_2, test_obj_1], ignore_identical=True)
+    pgbulk.update(models.TestModel, [test_obj_2, test_obj_1], ignore_identical=True)
+
+    test_obj_1 = models.TestModel.objects.get(id=test_obj_1.id)
+    test_obj_2 = models.TestModel.objects.get(id=test_obj_2.id)
+    assert test_obj_1.int_field == 7
+    assert test_obj_1.float_field == 8
+    assert test_obj_2.int_field == 9
+    assert test_obj_2.float_field == 10
+
+
+@pytest.mark.django_db
 def test_update_floats_to_null():
     """
     Tests updating a float field to a null field.

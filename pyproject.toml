@@ -27,8 +27,8 @@ packages = [
 exclude = [
   "*/tests/"
 ]
-version = "2.5.0"
-description = "Native postgres bulk update and upsert operations."
+version = "3.0.0"
+description = "Native Postgres update, upsert, and copy operations."
 authors = ["Wes Kendall"]
 classifiers = [
   "Intended Audience :: Developers",

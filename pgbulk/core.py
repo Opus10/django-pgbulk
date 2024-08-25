@@ -777,7 +777,7 @@ def copy(
     Note:
         Model signals such as `post_save` are not emitted.
     """
-    if psycopg_maj_version == 2:
+    if psycopg_maj_version == 2:  # pragma: no cover
         raise RuntimeError("Only psycopg3 is supported for pgbulk.copy.")
 
     queryset = queryset if isinstance(queryset, models.QuerySet) else queryset.objects.all()

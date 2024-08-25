@@ -14,48 +14,54 @@
 
 Do a bulk upsert on a model:
 
-    import pgbulk
+```python
+import pgbulk
 
-    pgbulk.upsert(
-        MyModel,
-        [
-            MyModel(int_field=1, some_attr="some_val1"),
-            MyModel(int_field=2, some_attr="some_val2"),
-        ],
-        # These are the fields that identify the uniqueness constraint.
-        ["int_field"],
-        # These are the fields that will be updated if the row already
-        # exists. If not provided, all fields will be updated
-        ["some_attr"]
-    )
+pgbulk.upsert(
+    MyModel,
+    [
+        MyModel(int_field=1, some_attr="some_val1"),
+        MyModel(int_field=2, some_attr="some_val2"),
+    ],
+    # These are the fields that identify the uniqueness constraint.
+    ["int_field"],
+    # These are the fields that will be updated if the row already
+    # exists. If not provided, all fields will be updated
+    ["some_attr"]
+)
+```
 
 Do a bulk update on a model:
 
-    import pgbulk
+```python
+import pgbulk
 
-    pgbulk.update(
-        MyModel,
-        [
-            MyModel(id=1, some_attr='some_val1'),
-            MyModel(id=2, some_attr='some_val2')
-        ],
-        # These are the fields that will be updated. If not provided,
-        # all fields will be updated
-        ['some_attr']
-    )
+pgbulk.update(
+    MyModel,
+    [
+        MyModel(id=1, some_attr='some_val1'),
+        MyModel(id=2, some_attr='some_val2')
+    ],
+    # These are the fields that will be updated. If not provided,
+    # all fields will be updated
+    ['some_attr']
+)
+```
 
 Do a bulk copy on a model:
 
-    import pgbulk
+```python
+import pgbulk
 
-    pgbulk.copy(
-        MyModel,
-        # Insert these rows using COPY FROM
-        [
-            MyModel(id=1, some_attr='some_val1'),
-            MyModel(id=2, some_attr='some_val2')
-        ],
-    )
+pgbulk.copy(
+    MyModel,
+    # Insert these rows using COPY FROM
+    [
+        MyModel(id=1, some_attr='some_val1'),
+        MyModel(id=2, some_attr='some_val2')
+    ],
+)
+```
 
 ## Advanced Features
 

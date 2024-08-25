@@ -61,7 +61,7 @@ print(results.updated)
 
 #### Use an expression for updates
 
-In the example, we increment `some_int_field` by one whenever an update happens. Otherwise it defaults to zero:
+In this example, we increment `some_int_field` by one whenever an update happens. Otherwise it defaults to zero:
 
 ```python
 pgbulk.upsert(
@@ -81,7 +81,7 @@ pgbulk.upsert(
 )
 ```
 
-#### Ignore updating unchanged rows
+#### Ignore updates to unchanged rows
 
 ```python
 pgbulk.upsert(
@@ -161,7 +161,7 @@ results = pgbulk.upsert(
 print(results[0].int_field)
 ```
 
-#### Ignore updating unchanged rows
+#### Ignore updates to unchanged rows
 
 ```python
 pgbulk.upsert(

@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.1
+
+#### Trivial
+
+  - Add overloads on `upsert`, `aupsert`, `update`, and `aupdate` to improve type-checking on `returning=...` by [@max-muoto](https://github.com/max-muoto) in [#40](https://github.com/Opus10/django-pgbulk/pull/40/).
+
 ## 3.0.0
 
 #### Breaking Changes

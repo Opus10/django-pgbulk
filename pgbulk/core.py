@@ -1,16 +1,17 @@
 import itertools
+import typing
 from typing import (
     TYPE_CHECKING,
     Any,
     Iterable,
     List,
-    Literal,
     NamedTuple,
     Tuple,
     Type,
     TypeVar,
     Union,
     cast,
+    overload,
 )
 
 from asgiref.sync import sync_to_async
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
     class Row(NamedTuple):
         """Represents a row returned by an upsert operation."""
 
-        status_: Literal["u", "c"]
+        status_: typing.Literal["u", "c"]
 
         def __getattr__(self, item: str) -> Any: ...
 
@@ -598,6 +599,42 @@ def _update(
     return updated if returning else None
 
 
+@overload
+def update(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    update_fields: Union[List[str], None] = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: Union[List[str], typing.Literal[True]] = ...,
+    ignore_unchanged: bool = False,
+) -> List["Row"]: ...
+
+
+@overload
+def update(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    update_fields: Union[List[str], None] = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: typing.Literal[False] = False,
+    ignore_unchanged: bool = False,
+) -> None: ...
+
+
+@overload
+def update(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    update_fields: Union[List[str], None] = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: Union[List[str], bool] = False,
+    ignore_unchanged: bool = False,
+) -> Union[List["Row"], None]: ...
+
+
 def update(
     queryset: QuerySet[_M],
     model_objs: Iterable[_M],
@@ -641,6 +678,42 @@ def update(
         )
 
 
+@overload
+async def aupdate(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    update_fields: Union[List[str], None] = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: Union[List[str], typing.Literal[True]] = ...,
+    ignore_unchanged: bool = False,
+) -> List["Row"]: ...
+
+
+@overload
+async def aupdate(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    update_fields: Union[List[str], None] = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: typing.Literal[False] = False,
+    ignore_unchanged: bool = False,
+) -> None: ...
+
+
+@overload
+async def aupdate(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    update_fields: Union[List[str], None] = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: Union[List[str], bool] = False,
+    ignore_unchanged: bool = False,
+) -> Union[List["Row"], None]: ...
+
+
 async def aupdate(
     queryset: QuerySet[_M],
     model_objs: Iterable[_M],
@@ -668,6 +741,45 @@ async def aupdate(
         returning=returning,
         ignore_unchanged=ignore_unchanged,
     )
+
+
+@overload
+def upsert(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    unique_fields: List[str],
+    update_fields: UpdateFieldsTypeDef = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: Union[List[str], typing.Literal[True]] = ...,
+    ignore_unchanged: bool = False,
+) -> UpsertResult: ...
+
+
+@overload
+def upsert(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    unique_fields: List[str],
+    update_fields: UpdateFieldsTypeDef = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: typing.Literal[False] = False,
+    ignore_unchanged: bool = False,
+) -> None: ...
+
+
+@overload
+def upsert(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    unique_fields: List[str],
+    update_fields: UpdateFieldsTypeDef = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: Union[List[str], bool] = False,
+    ignore_unchanged: bool = False,
+) -> Union[UpsertResult, None]: ...
 
 
 def upsert(
@@ -722,6 +834,45 @@ def upsert(
             ignore_unchanged=ignore_unchanged,
             cursor=cursor,
         )
+
+
+@overload
+async def aupsert(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    unique_fields: List[str],
+    update_fields: UpdateFieldsTypeDef = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: Union[List[str], typing.Literal[True]] = ...,
+    ignore_unchanged: bool = False,
+) -> UpsertResult: ...
+
+
+@overload
+async def aupsert(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    unique_fields: List[str],
+    update_fields: UpdateFieldsTypeDef = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: typing.Literal[False] = False,
+    ignore_unchanged: bool = False,
+) -> None: ...
+
+
+@overload
+async def aupsert(
+    queryset: QuerySet[_M],
+    model_objs: Iterable[_M],
+    unique_fields: List[str],
+    update_fields: UpdateFieldsTypeDef = None,
+    *,
+    exclude: Union[List[str], None] = None,
+    returning: Union[List[str], bool] = False,
+    ignore_unchanged: bool = False,
+) -> Union[UpsertResult, None]: ...
 
 
 async def aupsert(

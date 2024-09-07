@@ -1,10 +1,10 @@
 import itertools
-import typing
 from typing import (
     TYPE_CHECKING,
     Any,
     Iterable,
     List,
+    Literal,
     NamedTuple,
     Tuple,
     Type,
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     class Row(NamedTuple):
         """Represents a row returned by an upsert operation."""
 
-        status_: typing.Literal["u", "c"]
+        status_: Literal["u", "c"]
 
         def __getattr__(self, item: str) -> Any: ...
 
@@ -64,7 +64,6 @@ psycopg_maj_version = psycopg_version[0]
 
 
 if psycopg_maj_version == 2:
-    from psycopg2.extensions import AsIs as Literal  # type: ignore
     from psycopg2.extensions import quote_ident  # type: ignore
 elif psycopg_maj_version == 3:
     import psycopg.adapt  # type: ignore
@@ -606,7 +605,7 @@ def update(
     update_fields: Union[List[str], None] = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: Union[List[str], typing.Literal[True]] = ...,
+    returning: Union[List[str], Literal[True]] = ...,
     ignore_unchanged: bool = False,
 ) -> List["Row"]: ...
 
@@ -618,7 +617,7 @@ def update(
     update_fields: Union[List[str], None] = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: typing.Literal[False] = False,
+    returning: Literal[False] = False,
     ignore_unchanged: bool = False,
 ) -> None: ...
 
@@ -685,7 +684,7 @@ async def aupdate(
     update_fields: Union[List[str], None] = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: Union[List[str], typing.Literal[True]] = ...,
+    returning: Union[List[str], Literal[True]] = ...,
     ignore_unchanged: bool = False,
 ) -> List["Row"]: ...
 
@@ -697,7 +696,7 @@ async def aupdate(
     update_fields: Union[List[str], None] = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: typing.Literal[False] = False,
+    returning: Literal[False] = False,
     ignore_unchanged: bool = False,
 ) -> None: ...
 
@@ -751,7 +750,7 @@ def upsert(
     update_fields: UpdateFieldsTypeDef = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: Union[List[str], typing.Literal[True]] = ...,
+    returning: Union[List[str], Literal[True]] = ...,
     ignore_unchanged: bool = False,
 ) -> UpsertResult: ...
 
@@ -764,7 +763,7 @@ def upsert(
     update_fields: UpdateFieldsTypeDef = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: typing.Literal[False] = False,
+    returning: Literal[False] = False,
     ignore_unchanged: bool = False,
 ) -> None: ...
 
@@ -844,7 +843,7 @@ async def aupsert(
     update_fields: UpdateFieldsTypeDef = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: Union[List[str], typing.Literal[True]] = ...,
+    returning: Union[List[str], Literal[True]] = ...,
     ignore_unchanged: bool = False,
 ) -> UpsertResult: ...
 
@@ -857,7 +856,7 @@ async def aupsert(
     update_fields: UpdateFieldsTypeDef = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: typing.Literal[False] = False,
+    returning: Literal[False] = False,
     ignore_unchanged: bool = False,
 ) -> None: ...
 

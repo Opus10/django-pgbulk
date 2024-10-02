@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.2
+
+#### Trivial
+
+  - Remove elipses defaults on overloads to avoid incorrect resolution by [@max-muoto](https://github.com/max-muoto) in [#41](https://github.com/Opus10/django-pgbulk/pull/41/).
+
 ## 3.0.1
 
 #### Trivial

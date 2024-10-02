@@ -605,7 +605,7 @@ def update(
     update_fields: Union[List[str], None] = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: Union[List[str], Literal[True]] = ...,
+    returning: Union[List[str], Literal[True]],
     ignore_unchanged: bool = False,
 ) -> List["Row"]: ...
 
@@ -684,7 +684,7 @@ async def aupdate(
     update_fields: Union[List[str], None] = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: Union[List[str], Literal[True]] = ...,
+    returning: Union[List[str], Literal[True]],
     ignore_unchanged: bool = False,
 ) -> List["Row"]: ...
 
@@ -750,7 +750,7 @@ def upsert(
     update_fields: UpdateFieldsTypeDef = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: Union[List[str], Literal[True]] = ...,
+    returning: Union[List[str], Literal[True]],
     ignore_unchanged: bool = False,
 ) -> UpsertResult: ...
 
@@ -843,7 +843,7 @@ async def aupsert(
     update_fields: UpdateFieldsTypeDef = None,
     *,
     exclude: Union[List[str], None] = None,
-    returning: Union[List[str], Literal[True]] = ...,
+    returning: Union[List[str], Literal[True]],
     ignore_unchanged: bool = False,
 ) -> UpsertResult: ...
 

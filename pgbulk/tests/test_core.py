@@ -4,6 +4,8 @@ import ddf
 import freezegun
 import pytest
 from asgiref.sync import async_to_sync
+from django import __version__ as DJANGO_VERSION
+from django.db import transaction
 from django.db.models import F
 from pytz import timezone
 
@@ -1303,3 +1305,134 @@ def test_acopy():
 
     assert models.TestModel.objects.count() == 3
     assert set(models.TestModel.objects.values_list("int_field", flat=True)) == {1, 3, 4}
+
+
+@pytest.mark.skipif(
+    DJANGO_VERSION < "5.0",
+    reason="Only run on Django >= 5.0",
+)
+@pytest.mark.django_db
+def test_upsert_with_db_defaults():
+    """
+    Tests upsert behavior with db_defaults.
+    """
+    result = pgbulk.upsert(
+        models.TestDbDefaultModel,
+        [models.TestDbDefaultModel(id=1)],
+        ["id"],
+        returning=True,
+    )
+    assert len(result.created) == 1
+    assert result.created[0].int_field == 1
+    assert result.created[0].char_field == "test"
+    assert result.created[0].created_at is not None
+
+    # Insert where one row relies on the db_default, and the other does not.
+    result = pgbulk.upsert(
+        models.TestDbDefaultModel,
+        [
+            models.TestDbDefaultModel(id=2),
+            models.TestDbDefaultModel(id=3, int_field=3),
+        ],
+        ["id"],
+        returning=True,
+    )
+    assert len(result.created) == 2
+    assert result.created[0].int_field == 1
+    assert result.created[1].int_field == 3
+
+    # Test upserting an existing record without changing the db_default field
+    # First change the int_field to something other than the db_default
+    models.TestDbDefaultModel.objects.filter(id=1).update(int_field=42)
+
+    result = pgbulk.upsert(
+        models.TestDbDefaultModel,
+        [models.TestDbDefaultModel(id=1)],
+        ["id"],
+        returning=True,
+    )
+    # Should go back to the db_default value.
+    assert result.updated[0].int_field == 1
+
+    # This should not change the int_field now.
+    models.TestDbDefaultModel.objects.filter(id=1).update(int_field=42)
+    result = pgbulk.upsert(
+        models.TestDbDefaultModel,
+        [models.TestDbDefaultModel(id=1)],
+        ["id"],
+        ["created_at"],
+        returning=True,
+    )
+    assert result.updated[0].int_field == 42
+
+    # Same situation but override the db_default value.
+    result = pgbulk.upsert(
+        models.TestDbDefaultModel,
+        [models.TestDbDefaultModel(id=1, int_field=100)],
+        ["id"],
+        ["created_at"],
+        returning=True,
+    )
+    assert result.updated[0].int_field == 42
+
+    # Case in which second field isn't provided, but first and third are.
+    # This is test positional placeholder behavior, and make sure that filling
+    # in DEFAULT for char_field doesn't carry over to created_at.
+    result = pgbulk.upsert(
+        models.TestDbDefaultModel,
+        [models.TestDbDefaultModel(id=1, int_field=100, created_at=dt.datetime(2024, 1, 1))],
+        ["id"],
+        returning=True,
+    )
+    assert result.updated[0].int_field == 100
+    assert result.updated[0].char_field == "test"
+    assert result.updated[0].created_at == dt.datetime(2024, 1, 1)
+
+
+@pytest.mark.skipif(
+    DJANGO_VERSION < "5.0",
+    reason="Only run on Django >= 5.0",
+)
+@pytest.mark.django_db
+def test_update_with_db_defaults():
+    """
+    Test that we can properly update objects that have db defaults.
+    """
+    obj = models.TestDbDefaultModel.objects.create()
+    obj.int_field = 100
+    pgbulk.update(models.TestDbDefaultModel, [obj], ["int_field"])
+    assert obj.int_field == 100
+
+    obj.char_field = "updated"
+
+    pgbulk.update(models.TestDbDefaultModel, [obj], ["char_field", "int_field"])
+    assert obj.char_field == "updated"
+    # Int field should remain unchanged
+    assert obj.int_field == 100
+
+
+@pytest.mark.skipif(
+    psycopg_maj_version == 2 or DJANGO_VERSION < "5.0",
+    reason="Only run on psycopg3 and Django >= 5.0",
+)
+@pytest.mark.django_db
+def test_copy_with_db_defaults():
+    """
+    Testing that copy isn't not supported with db defaults.
+    """
+    with pytest.raises(
+        ValueError, match="DB defaults are not supported when copying"
+    ), transaction.atomic():
+        pgbulk.copy(models.TestDbDefaultModel, [models.TestDbDefaultModel()])
+
+    # If we provide a value, this should work.
+    pgbulk.copy(models.TestDbDefaultModel, [models.TestDbDefaultModel(int_field=1)], ["int_field"])
+    assert models.TestDbDefaultModel.objects.get().int_field == 1
+
+    # Additionally, an ORM paired with a db default should work.
+    pgbulk.copy(
+        models.TestDbDefaultModelWithOrmDefault,
+        [models.TestDbDefaultModelWithOrmDefault()],
+        ["int_field"],
+    )
+    assert models.TestDbDefaultModelWithOrmDefault.objects.get().int_field == 1

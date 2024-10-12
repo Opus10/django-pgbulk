@@ -1,3 +1,4 @@
+from django import __version__ as DJANGO_VERSION
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django_hashids import HashidsField
@@ -90,3 +91,19 @@ class TestPkChar(models.Model):
 
     my_key = models.CharField(max_length=128, primary_key=True)
     char_field = models.CharField(max_length=128, null=True)
+
+
+if DJANGO_VERSION >= "5.0":
+    from django.db.models.functions import Now
+
+    class TestDbDefaultModel(models.Model):
+        """A model to test that database defaults are not upserted"""
+
+        int_field = models.IntegerField(db_default=1)
+        char_field = models.CharField(max_length=128, db_default="test")
+        created_at = models.DateTimeField(db_default=Now())
+
+    class TestDbDefaultModelWithOrmDefault(models.Model):
+        """A model to test that a db default can be paired with an ORM default."""
+
+        int_field = models.IntegerField(db_default=1, default=1)

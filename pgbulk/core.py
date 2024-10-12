@@ -33,7 +33,8 @@ AnyField: TypeAlias = "models.Field[Any, Any]"
 Expression: TypeAlias = "models.Expression | models.F"
 
 
-class _DB_DEFAULT: ...
+class _DB_DEFAULT:
+    """Sentinel value for a database default."""
 
 
 if TYPE_CHECKING:

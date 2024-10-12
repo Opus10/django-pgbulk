@@ -256,7 +256,10 @@ def _get_field_db_val(
             return _DB_DEFAULT
         else:
             raise ValueError(
-                "DB defaults are not supported when copying, please provide an ORM default value"
+                (
+                    "DB defaults are not supported when copying, "
+                    "please provide an ORM default with `default=`"
+                )
             )
 
     elif hasattr(value, "resolve_expression"):  # pragma: no cover

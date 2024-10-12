@@ -321,10 +321,10 @@ def _format_placeholders_row(
     include_cast: bool,
 ) -> str:
     placeholders = ", ".join(
-        f"{'%s'}{f'::{f.db_type(connection)}' if include_cast else ''}"
+        f"{'%s'}{f'::{field.db_type(connection)}' if include_cast else ''}"
         if val is not _DB_DEFAULT
         else "DEFAULT"
-        for val, f in zip(values_for_row, all_fields)
+        for val, field in zip(values_for_row, all_fields)
     )
     return f"({placeholders})"
 

@@ -1314,7 +1314,7 @@ def test_acopy():
 @pytest.mark.django_db
 def test_upsert_with_db_defaults():
     """
-    Tests upsert behavior with db_defaults.
+    Test that we can properly upsert objects that have db defaults.
     """
     result = pgbulk.upsert(
         models.TestDbDefaultModel,
@@ -1418,7 +1418,7 @@ def test_update_with_db_defaults():
 @pytest.mark.django_db
 def test_copy_with_db_defaults():
     """
-    Testing that copy isn't not supported with db defaults.
+    Test that we cannot copy objects that have db defaults.
     """
     with pytest.raises(
         ValueError, match="DB defaults are not supported when copying"

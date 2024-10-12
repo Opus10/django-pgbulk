@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.0
+
+#### Feature
+
+  - Add support for db defaults in `pgbulk.upsert` by [@max-muoto](https://github.com/max-muoto) in [#42](https://github.com/Opus10/django-pgbulk/pull/42).
+
 ## 3.0.2
 
 #### Trivial

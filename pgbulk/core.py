@@ -970,12 +970,10 @@ def copy(
         with cursor.copy(copy_sql) as copier:  # type: ignore
             if binary:
                 postgres_types = _postgres_types_for_fields(fields, queryset.db)
-                print("Postgres types:", postgres_types)
                 copier.set_types(postgres_types)  # type: ignore
 
             for model_obj in model_objs:
                 row = _get_values_for_row(queryset, model_obj, fields)
-                print("Row:", row)
                 copier.write_row(row)  # type: ignore
 
 

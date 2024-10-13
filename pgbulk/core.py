@@ -21,7 +21,7 @@ from django.db import connections, models
 from django.db.models.sql.compiler import SQLCompiler
 from django.utils import timezone
 from django.utils.version import get_version_tuple
-from typing_extensions import TypeAlias
+from typing_extensions import Final, TypeAlias
 
 UpdateFieldsTypeDef: TypeAlias = Union[
     List[str], List["UpdateField"], List[Union["UpdateField", str]], None
@@ -31,7 +31,7 @@ QuerySet: TypeAlias = Union[Type[_M], models.QuerySet[_M]]
 AnyField: TypeAlias = "models.Field[Any, Any]"
 Expression: TypeAlias = "models.Expression | models.F"
 
-_POSTGRES_PLACEHOLDER_RE = re.compile(r"\(.*?\)")
+_POSTGRES_PLACEHOLDER_RE: "Final" = re.compile(r"\(.*?\)")
 
 
 if TYPE_CHECKING:

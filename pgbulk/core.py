@@ -1,4 +1,5 @@
 import itertools
+import re
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -29,6 +30,8 @@ _M = TypeVar("_M", bound=models.Model)
 QuerySet: TypeAlias = Union[Type[_M], models.QuerySet[_M]]
 AnyField: TypeAlias = "models.Field[Any, Any]"
 Expression: TypeAlias = "models.Expression | models.F"
+
+_POSTGRES_PLACEHOLDER_RE = re.compile(r"\(.*?\)")
 
 
 if TYPE_CHECKING:
@@ -905,12 +908,21 @@ async def aupsert(
     )
 
 
+def _postgres_types_for_fields(fields: List["models.Field[Any, Any]"], db: str) -> List[str]:
+    def _simplify_type(field_type: str) -> str:
+        # Remove any size/precision/scale information, as Psycopg doesn't accept it.
+        return _POSTGRES_PLACEHOLDER_RE.sub("", field_type)
+
+    return [_simplify_type(field.db_type(connection=connections[db])) for field in fields]
+
+
 def copy(
     queryset: QuerySet[_M],
     model_objs: Iterable[_M],
     copy_fields: UpdateFieldsTypeDef = None,
     *,
     exclude: Union[List[str], None] = None,
+    binary: bool = False,
 ) -> None:
     """
     Copy data into a table.
@@ -923,6 +935,8 @@ def copy(
         exclude: A list of fields to exclude from the copy. This is useful
             when `copy_fields` is `None` and you want to exclude fields from
             being copied.
+        binary: If True, copy data in binary format.
+            This can yield improved performance for large data sets.
 
     Note:
         Model signals such as `post_save` are not emitted.
@@ -950,9 +964,18 @@ def copy(
         copy_sql = (
             f"COPY {_quote(model._meta.db_table, cursor)} ({all_field_names_sql}) FROM STDIN"
         )
+        if binary:
+            copy_sql += " WITH (FORMAT BINARY)"
+
         with cursor.copy(copy_sql) as copier:  # type: ignore
+            if binary:
+                postgres_types = _postgres_types_for_fields(fields, queryset.db)
+                print("Postgres types:", postgres_types)
+                copier.set_types(postgres_types)  # type: ignore
+
             for model_obj in model_objs:
                 row = _get_values_for_row(queryset, model_obj, fields)
+                print("Row:", row)
                 copier.write_row(row)  # type: ignore
 
 
@@ -962,6 +985,7 @@ async def acopy(
     copy_fields: UpdateFieldsTypeDef = None,
     *,
     exclude: Union[List[str], None] = None,
+    binary: bool = False,
 ) -> None:
     """
     Asynchronously copy data into a table.
@@ -978,4 +1002,5 @@ async def acopy(
         model_objs,
         copy_fields=copy_fields,
         exclude=exclude,
+        binary=binary,
     )

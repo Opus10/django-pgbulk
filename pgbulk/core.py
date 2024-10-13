@@ -254,7 +254,7 @@ def _get_field_db_val(
     connection: "DefaultConnectionProxy",
     *,
     copying: bool = False,
-) -> "Any | _DB_DEFAULT":
+) -> "Any | type[_DB_DEFAULT]":
     if _value_is_db_default(value):
         if not copying:
             return _DB_DEFAULT

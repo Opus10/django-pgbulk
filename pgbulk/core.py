@@ -31,7 +31,7 @@ QuerySet: TypeAlias = Union[Type[_M], models.QuerySet[_M]]
 AnyField: TypeAlias = "models.Field[Any, Any]"
 Expression: TypeAlias = "models.Expression | models.F"
 
-_POSTGRES_PLACEHOLDER_RE: "Final" = re.compile(r"\(.*?\)")
+_PRECISION_SPECIFIER_RE: "Final" = re.compile(r"\(.*?\)")
 
 
 if TYPE_CHECKING:
@@ -911,7 +911,7 @@ async def aupsert(
 def _postgres_types_for_fields(fields: List["models.Field[Any, Any]"], db: str) -> List[str]:
     def _simplify_type(field_type: str) -> str:
         # Remove any size/precision/scale information, as Psycopg doesn't accept it.
-        return _POSTGRES_PLACEHOLDER_RE.sub("", field_type)
+        return _PRECISION_SPECIFIER_RE.sub("", field_type)
 
     return [_simplify_type(field.db_type(connection=connections[db])) for field in fields]
 

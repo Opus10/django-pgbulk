@@ -936,7 +936,7 @@ def copy(
             when `copy_fields` is `None` and you want to exclude fields from
             being copied.
         binary: If True, copy data in binary format.
-            This can yield improved performance for large data sets.
+            This can yield improved performance for large datasets.
 
     Note:
         Model signals such as `post_save` are not emitted.

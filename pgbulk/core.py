@@ -908,12 +908,15 @@ async def aupsert(
     )
 
 
-def _postgres_types_for_fields(fields: List["models.Field[Any, Any]"], db: str) -> List[str]:
+def _postgres_types_for_fields(
+    fields: List["models.Field[Any, Any]"],
+    connection: "DefaultConnectionProxy",
+) -> List[str]:
     def _simplify_type(field_type: str) -> str:
         # Remove any size/precision/scale information, as Psycopg doesn't accept it.
         return _PRECISION_SPECIFIER_RE.sub("", field_type)
 
-    return [_simplify_type(field.db_type(connection=connections[db])) for field in fields]
+    return [_simplify_type(field.db_type(connection=connection)) for field in fields]
 
 
 def copy(
@@ -959,7 +962,8 @@ def copy(
     ]
     cols = [field.column for field in fields]
 
-    with connections[queryset.db].cursor() as cursor:
+    connection = connections[queryset.db]
+    with connection.cursor() as cursor:
         all_field_names_sql = ", ".join([_quote(col, cursor) for col in cols])
         copy_sql = (
             f"COPY {_quote(model._meta.db_table, cursor)} ({all_field_names_sql}) FROM STDIN"
@@ -969,7 +973,7 @@ def copy(
 
         with cursor.copy(copy_sql) as copier:  # type: ignore
             if binary:
-                postgres_types = _postgres_types_for_fields(fields, queryset.db)
+                postgres_types = _postgres_types_for_fields(fields, connection)
                 copier.set_types(postgres_types)  # type: ignore
 
             for model_obj in model_objs:

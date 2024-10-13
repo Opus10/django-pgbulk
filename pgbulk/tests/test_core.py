@@ -1234,7 +1234,8 @@ def test_aupdate():
 
 @pytest.mark.skipif(psycopg_maj_version == 2, reason="Only run on psycopg3")
 @pytest.mark.django_db(transaction=True)
-def test_copy():
+@pytest.mark.parametrize("binary", [True, False])
+def test_copy(binary: bool):
     """
     Tests copying data into a table
     """
@@ -1245,6 +1246,7 @@ def test_copy():
             models.TestModel(int_field=3),
             models.TestModel(int_field=4),
         ],
+        binary=binary,
     )
 
     assert models.TestModel.objects.count() == 3
@@ -1253,7 +1255,8 @@ def test_copy():
 
 @pytest.mark.skipif(psycopg_maj_version == 2, reason="Only run on psycopg3")
 @pytest.mark.django_db(transaction=True)
-def test_copy_with_fields():
+@pytest.mark.parametrize("binary", [True, False])
+def test_copy_with_fields(binary: bool):
     """
     Tests copying data into a table with specific fields listed
     """
@@ -1265,6 +1268,7 @@ def test_copy_with_fields():
             models.TestModel(int_field=4),
         ],
         ["int_field", "json_field", "array_field", "time_zone"],
+        binary=binary,
     )
 
     assert models.TestModel.objects.count() == 3
@@ -1286,7 +1290,8 @@ def test_copy_with_fields():
 
 @pytest.mark.skipif(psycopg_maj_version == 2, reason="Only run on psycopg3")
 @pytest.mark.django_db
-def test_acopy():
+@pytest.mark.parametrize("binary", [True, False])
+def test_acopy(binary: bool):
     """
     Basic test for async copy
     """
@@ -1299,6 +1304,7 @@ def test_acopy():
                 models.TestModel(int_field=3),
                 models.TestModel(int_field=4),
             ],
+            binary=binary,
         )
 
     async_to_sync(_run_acopy)()

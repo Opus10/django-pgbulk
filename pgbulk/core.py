@@ -1,4 +1,5 @@
 import itertools
+import re
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -22,7 +23,7 @@ from django.db.models import expressions
 from django.db.models.sql.compiler import SQLCompiler
 from django.utils import timezone
 from django.utils.version import get_version_tuple
-from typing_extensions import TypeAlias
+from typing_extensions import Final, TypeAlias
 
 UpdateFieldsTypeDef: TypeAlias = Union[
     List[str], List["UpdateField"], List[Union["UpdateField", str]], None
@@ -31,6 +32,8 @@ _M = TypeVar("_M", bound=models.Model)
 QuerySet: TypeAlias = Union[Type[_M], models.QuerySet[_M]]
 AnyField: TypeAlias = "models.Field[Any, Any]"
 Expression: TypeAlias = "models.Expression | models.F"
+
+_PRECISION_SPECIFIER_RE: "Final" = re.compile(r"\(.*?\)")
 
 
 class _DB_DEFAULT:
@@ -952,12 +955,24 @@ async def aupsert(
     )
 
 
+def _postgres_types_for_fields(
+    fields: List["models.Field[Any, Any]"],
+    connection: "DefaultConnectionProxy",
+) -> List[str]:
+    def _simplify_type(field_type: str) -> str:
+        # Remove any size/precision/scale information, as Psycopg doesn't accept it.
+        return _PRECISION_SPECIFIER_RE.sub("", field_type)
+
+    return [_simplify_type(field.db_type(connection=connection)) for field in fields]
+
+
 def copy(
     queryset: QuerySet[_M],
     model_objs: Iterable[_M],
     copy_fields: UpdateFieldsTypeDef = None,
     *,
     exclude: Union[List[str], None] = None,
+    binary: bool = False,
 ) -> None:
     """
     Copy data into a table.
@@ -970,6 +985,8 @@ def copy(
         exclude: A list of fields to exclude from the copy. This is useful
             when `copy_fields` is `None` and you want to exclude fields from
             being copied.
+        binary: If True, copy data in binary format.
+            This can yield improved performance for large datasets.
 
     Note:
         Model signals such as `post_save` are not emitted.
@@ -992,12 +1009,20 @@ def copy(
     ]
     cols = [field.column for field in fields]
 
-    with connections[queryset.db].cursor() as cursor:
+    connection = connections[queryset.db]
+    with connection.cursor() as cursor:
         all_field_names_sql = ", ".join([_quote(col, cursor) for col in cols])
         copy_sql = (
             f"COPY {_quote(model._meta.db_table, cursor)} ({all_field_names_sql}) FROM STDIN"
         )
+        if binary:
+            copy_sql += " WITH (FORMAT BINARY)"
+
         with cursor.copy(copy_sql) as copier:  # type: ignore
+            if binary:
+                postgres_types = _postgres_types_for_fields(fields, connection)
+                copier.set_types(postgres_types)  # type: ignore
+
             for model_obj in model_objs:
                 row = _get_values_for_row(queryset, model_obj, fields, copying=True)
                 copier.write_row(row)  # type: ignore
@@ -1009,6 +1034,7 @@ async def acopy(
     copy_fields: UpdateFieldsTypeDef = None,
     *,
     exclude: Union[List[str], None] = None,
+    binary: bool = False,
 ) -> None:
     """
     Asynchronously copy data into a table.
@@ -1025,4 +1051,5 @@ async def acopy(
         model_objs,
         copy_fields=copy_fields,
         exclude=exclude,
+        binary=binary,
     )

@@ -16,8 +16,10 @@ from typing import (
 )
 
 from asgiref.sync import sync_to_async
+from django import __version__ as DJANGO_VERSION
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connections, models
+from django.db.models import expressions
 from django.db.models.sql.compiler import SQLCompiler
 from django.utils import timezone
 from django.utils.version import get_version_tuple
@@ -32,6 +34,10 @@ AnyField: TypeAlias = "models.Field[Any, Any]"
 Expression: TypeAlias = "models.Expression | models.F"
 
 _PRECISION_SPECIFIER_RE: "Final" = re.compile(r"\(.*?\)")
+
+
+class _DB_DEFAULT:
+    """Sentinel value for a database default."""
 
 
 if TYPE_CHECKING:
@@ -62,6 +68,7 @@ def _psycopg_version() -> Tuple[int, int, int]:
     return version_tuple
 
 
+django_version = DJANGO_VERSION
 psycopg_version = _psycopg_version()
 psycopg_maj_version = psycopg_version[0]
 
@@ -235,13 +242,31 @@ def _prep_sql_args(
     ]
 
 
+def _value_is_db_default(value: Any) -> bool:
+    """Check if the value is a database default, they were introduced in Django 5.0"""
+    return django_version >= "5.0" and isinstance(value, expressions.DatabaseDefault)  # type: ignore - missing stubs
+
+
 def _get_field_db_val(
     queryset: models.QuerySet[_M],
     field: AnyField,
     value: Any,
     connection: "DefaultConnectionProxy",
-) -> Any:
-    if hasattr(value, "resolve_expression"):  # pragma: no cover
+    *,
+    copying: bool = False,
+) -> "Any | _DB_DEFAULT":
+    if _value_is_db_default(value):
+        if not copying:
+            return _DB_DEFAULT
+        else:
+            raise ValueError(
+                (
+                    "DB defaults are not supported when copying, "
+                    "please provide an ORM default with `default=`"
+                )
+            )
+
+    elif hasattr(value, "resolve_expression"):  # pragma: no cover
         # Handle cases when the field is of type "Func" and other expressions.
         # This is useful for libraries like django-rdkit that can't easily be tested
         return value.resolve_expression(queryset.query, allow_joins=False, for_save=True)
@@ -277,14 +302,34 @@ def _get_values_for_row(
     queryset: models.QuerySet[_M],
     model_obj: _M,
     all_fields: List[AnyField],
+    *,
+    copying: bool = False,
 ) -> List[Any]:
     connection = connections[queryset.db]
     return [
         # Convert field value to db value
         # Use attname here to support fields with custom db_column names
-        _get_field_db_val(queryset, field, getattr(model_obj, field.attname), connection)
+        _get_field_db_val(
+            queryset, field, getattr(model_obj, field.attname), connection, copying=copying
+        )
         for field in all_fields
     ]
+
+
+def _format_placeholders_row(
+    values_for_row: List[Any],
+    all_fields: List[AnyField],
+    connection: "DefaultConnectionProxy",
+    *,
+    include_cast: bool,
+) -> str:
+    placeholders = ", ".join(
+        f"{'%s'}{f'::{field.db_type(connection)}' if include_cast else ''}"
+        if val is not _DB_DEFAULT
+        else "DEFAULT"
+        for val, field in zip(values_for_row, all_fields)
+    )
+    return f"({placeholders})"
 
 
 def _get_values_for_rows(
@@ -297,15 +342,18 @@ def _get_values_for_rows(
     sql_args: List[Any] = []
 
     for i, model_obj in enumerate(model_objs):
-        sql_args.extend(_get_values_for_row(queryset, model_obj, all_fields))
+        values_for_row = _get_values_for_row(queryset, model_obj, all_fields)
+        sql_args.extend((val for val in values_for_row if val is not _DB_DEFAULT))
         if i == 0:
             row_values.append(
-                "({0})".format(
-                    ", ".join(["%s::{0}".format(f.db_type(connection)) for f in all_fields])
-                )
+                _format_placeholders_row(values_for_row, all_fields, connection, include_cast=True)
             )
         else:
-            row_values.append("({0})".format(", ".join(["%s"] * len(all_fields))))
+            row_values.append(
+                _format_placeholders_row(
+                    values_for_row, all_fields, connection, include_cast=False
+                )
+            )
 
     return row_values, sql_args
 
@@ -410,7 +458,6 @@ def _get_upsert_sql(
     update_db_cols = [model._meta.get_field(update_field).column for update_field in update_fields]
 
     row_values, sql_args = _get_values_for_rows(queryset, model_objs, all_fields)
-
     unique_field_names_sql = ", ".join([_quote(col, cursor) for col in unique_db_cols])
     update_fields_sql, ignore_unchanged_sql = _get_update_fields_sql(
         queryset=queryset,
@@ -977,7 +1024,7 @@ def copy(
                 copier.set_types(postgres_types)  # type: ignore
 
             for model_obj in model_objs:
-                row = _get_values_for_row(queryset, model_obj, fields)
+                row = _get_values_for_row(queryset, model_obj, fields, copying=True)
                 copier.write_row(row)  # type: ignore
 
 

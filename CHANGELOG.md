@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.2.0
+
+#### Changes
+
+  - Added Python 3.13 support, dropped Python 3.8. Added Postgres17 support by [@wesleykendall](https://github.com/wesleykendall) in [#49](https://github.com/Opus10/django-pgbulk/pull/49).
+
 ## 3.1.0
 
 #### Feature

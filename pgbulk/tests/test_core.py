@@ -1426,9 +1426,10 @@ def test_copy_with_db_defaults():
     """
     Test that we cannot copy objects that have db defaults.
     """
-    with pytest.raises(
-        ValueError, match="DB defaults are not supported when copying"
-    ), transaction.atomic():
+    with (
+        pytest.raises(ValueError, match="DB defaults are not supported when copying"),
+        transaction.atomic(),
+    ):
         pgbulk.copy(models.TestDbDefaultModel, [models.TestDbDefaultModel()])
 
     # If we provide a value, this should work.

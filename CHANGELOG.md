@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.2.1 (2024-12-15)
+
+#### Changes
+
+  - Changed project ownership to `AmbitionEng` by [@wesleykendall](https://github.com/wesleykendall) in [#50](https://github.com/AmbitionEng/django-pgbulk/pull/50).
+
 ## 3.2.0
 
 #### Changes

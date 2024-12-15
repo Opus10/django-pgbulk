@@ -47,8 +47,8 @@ classifiers = [
 ]
 license = "BSD-3-Clause"
 readme = "README.md"
-homepage = "https://github.com/Opus10/django-pgbulk"
-repository = "https://github.com/Opus10/django-pgbulk"
+homepage = "https://github.com/AmbitionEng/django-pgbulk"
+repository = "https://github.com/AmbitionEng/django-pgbulk"
 documentation = "https://django-pgbulk.readthedocs.io"
 
 [tool.poetry.dependencies]

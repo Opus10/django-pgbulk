@@ -1,12 +1,12 @@
 # Contributing Guide
 
-This project was created using footing. For more information about footing, go to the [footing docs](https://github.com/Opus10/footing).
+This project was created using footing. For more information about footing, go to the [footing docs](https://github.com/AmbitionEng/footing).
 
 ## Setup
 
 Set up your development environment with:
 
-    git clone git@github.com:Opus10/django-pgbulk.git
+    git clone git@github.com:AmbitionEng/django-pgbulk.git
     cd django-pgbulk
     make docker-setup
 
